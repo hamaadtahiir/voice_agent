@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+{% set active_page = "businesses" %}
+
+{% block title %}{{ 'Edit Business' if business_id else 'New Business' }} - InboundBot Admin{% endblock %}
+{% block page_title %}{{ 'Edit Business' if business_id else 'New Business' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-4">
+
+  {# ---- Header ---- #}
+  <div class="flex items-center gap-3">
+    <a href="/admin/businesses" class="text-slate-400 hover:text-slate-600 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div>
+      <h2 class="text-xl font-bold text-slate-800">{{ 'Edit Business' if business_id else 'Create New Business' }}</h2>
+      <p class="text-sm text-slate-500">{{ 'Update business configuration' if business_id else 'Set up a new business profile' }}</p>
+    </div>
+  </div>
+
+  {# ---- Tabs ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    {# Tab buttons #}
+    <div class="flex border-b border-gray-200 overflow-x-auto px-2 pt-1">
+      <button class="tab-btn active" data-tab-target="basic" data-group="biz"
+              onclick="switchTab('biz','basic')">Basic Info</button>
+      <button class="tab-btn" data-tab-target="service-areas" data-group="biz"
+              onclick="switchTab('biz','service-areas')">Service Areas</button>
+      <button class="tab-btn" data-tab-target="services" data-group="biz"
+              onclick="switchTab('biz','services')">Services</button>
+      <button class="tab-btn" data-tab-target="hours" data-group="biz"
+              onclick="switchTab('biz','hours')">Business Hours</button>
+      <button class="tab-btn" data-tab-target="branding" data-group="biz"
+              onclick="switchTab('biz','branding')">Branding</button>
+      <button class="tab-btn" data-tab-target="integrations" data-group="biz"
+              onclick="switchTab('biz','integrations')">Integrations</button>
+    </div>
+
+    <form id="business-form" onsubmit="saveBusiness(event)" class="p-6" data-tab-group="biz">
+
+      {# ========== BASIC INFO TAB ========== #}
+      <div id="tab-basic" class="tab-panel active">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Business Name <span class="text-red-500">*</span></label>
+            <input type="text" id="business-name" name="name" required
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="Acme HVAC Services">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Slug <span class="text-red-500">*</span></label>
+            <input type="text" id="business-slug" name="slug" required
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="acme-hvac-services">
+            <p class="text-xs text-slate-400 mt-1">Auto-generated from name. Edit to customize.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Industry <span class="text-red-500">*</span></label>
+            <select name="industry" id="business-industry" required
+                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+              <option value="">Select industry</option>
+              <option value="hvac">HVAC</option>
+              <option value="plumbing">Plumbing</option>
+              <option value="electrical">Electrical</option>
+              <option value="roofing">Roofing</option>
+              <option value="landscaping">Landscaping</option>
+              <option value="cleaning">Cleaning</option>
+              <option value="pest_control">Pest Control</option>
+              <option value="general_contracting">General Contracting</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
+            <input type="tel" name="phone" id="business-phone"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="+1 (555) 123-4567">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+            <input type="email" name="email" id="business-email"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="info@acme-hvac.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Website</label>
+            <input type="url" name="website" id="business-website"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="https://acme-hvac.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Timezone</label>
+            <select name="timezone" id="business-timezone"
+                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+              <option value="America/New_York">Eastern (ET)</option>
+              <option value="America/Chicago">Central (CT)</option>
+              <option value="America/Denver">Mountain (MT)</option>
+              <option value="America/Los_Angeles">Pacific (PT)</option>
+              <option value="America/Anchorage">Alaska (AKT)</option>
+              <option value="Pacific/Honolulu">Hawaii (HT)</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="is_active" id="business-active" checked
+                     class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+              <span class="text-sm font-medium text-slate-700">Active</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {# ========== SERVICE AREAS TAB ========== #}
+      <div id="tab-service-areas" class="tab-panel">
+        <div class="mb-4">
+          <p class="text-sm text-slate-500 mb-4">Define the geographic areas this business serves.</p>
+          <div class="flex gap-2 mb-3">
+            <input type="text" id="new-zip" placeholder="Zip code (e.g. 90210)"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition w-40">
+            <button type="button" onclick="addServiceArea('zip')"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">
+              Add Zip
+            </button>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <input type="text" id="new-city" placeholder="City"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition flex-1">
+            <input type="text" id="new-state" placeholder="State (e.g. CA)"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition w-28">
+            <button type="button" onclick="addServiceArea('city')"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">
+              Add City
+            </button>
+          </div>
+        </div>
+        <div id="service-areas-list" class="space-y-2">
+          <p class="text-sm text-slate-400 italic">No service areas added yet.</p>
+        </div>
+      </div>
+
+      {# ========== SERVICES TAB ========== #}
+      <div id="tab-services" class="tab-panel">
+        <div class="mb-4 flex items-center justify-between">
+          <p class="text-sm text-slate-500">Define the services this business offers.</p>
+          <button type="button" onclick="addService()"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Service
+          </button>
+        </div>
+        <div id="services-list" class="space-y-3">
+          <p class="text-sm text-slate-400 italic">No services added yet. Click "Add Service" to begin.</p>
+        </div>
+      </div>
+
+      {# ========== BUSINESS HOURS TAB ========== #}
+      <div id="tab-hours" class="tab-panel">
+        <p class="text-sm text-slate-500 mb-4">Set operating hours for each day of the week.</p>
+        <div class="space-y-3" id="hours-list">
+          {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+          {% for day in days %}
+          <div class="flex flex-wrap items-center gap-3 py-2 border-b border-gray-100 last:border-0" data-day="{{ day }}">
+            <label class="w-28 text-sm font-medium text-slate-700">{{ day }}</label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" class="day-closed w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500"
+                     onchange="toggleDayClosed(this)">
+              <span class="text-sm text-slate-500">Closed</span>
+            </label>
+            <div class="flex items-center gap-2 day-times">
+              <input type="time" class="day-open px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                     value="{{ '08:00' if day != 'Sunday' else '10:00' }}">
+              <span class="text-slate-400 text-sm">to</span>
+              <input type="time" class="day-close px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                     value="{{ '17:00' if day not in ['Saturday','Sunday'] else '15:00' }}">
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ========== BRANDING TAB ========== #}
+      <div id="tab-branding" class="tab-panel">
+        <p class="text-sm text-slate-500 mb-4">Customize the look and feel of the chat widget and communications.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Primary Color</label>
+            <div class="flex items-center gap-3">
+              <input type="color" id="brand-color" name="primary_color" value="#2563eb"
+                     class="w-10 h-10 rounded border border-gray-300 cursor-pointer">
+              <input type="text" id="brand-color-hex" value="#2563eb"
+                     class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                     oninput="document.getElementById('brand-color').value = this.value">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Logo URL</label>
+            <input type="url" name="logo_url" id="brand-logo"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="https://example.com/logo.png">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">Welcome Message</label>
+            <textarea name="welcome_message" id="brand-welcome" rows="3"
+                      class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition resize-y"
+                      placeholder="Hi! Welcome to [Business Name]. How can we help you today?"></textarea>
+            <p class="text-xs text-slate-400 mt-1">Shown when the chat widget opens.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ========== INTEGRATIONS TAB ========== #}
+      <div id="tab-integrations" class="tab-panel">
+        <p class="text-sm text-slate-500 mb-4">Connect external services and configure notifications.</p>
+        <div class="space-y-6">
+
+          {# Google Calendar #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/>
+              </svg>
+              Google Calendar
+            </h4>
+            <button type="button" id="gcal-connect-btn" onclick="connectGoogleCalendar()"
+                    class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-sm font-medium rounded-lg transition text-slate-700">
+              Connect Google Calendar
+            </button>
+            <p class="text-xs text-slate-400 mt-2">Allows automatic appointment scheduling to Google Calendar.</p>
+          </div>
+
+          {# Slack #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3">Slack Notifications</h4>
+            <label class="block text-sm text-slate-600 mb-1.5">Webhook URL</label>
+            <input type="url" name="slack_webhook_url" id="int-slack"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="https://hooks.slack.com/services/...">
+          </div>
+
+          {# Email Notifications #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3">Email Notifications</h4>
+            <label class="block text-sm text-slate-600 mb-1.5">Notification Emails (comma-separated)</label>
+            <input type="text" name="notification_emails" id="int-emails"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="manager@company.com, support@company.com">
+          </div>
+
+          {# Phone / SMS #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3">Phone / SMS Notifications</h4>
+            <label class="block text-sm text-slate-600 mb-1.5">Notification Phone Number</label>
+            <input type="tel" name="notification_phone" id="int-phone"
+                   class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                   placeholder="+1 (555) 123-4567">
+          </div>
+
+          {# WhatsApp #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3">WhatsApp Configuration</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-slate-600 mb-1.5">WhatsApp Phone Number ID</label>
+                <input type="text" name="whatsapp_phone_id" id="int-wa-phone"
+                       class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                       placeholder="1234567890">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-600 mb-1.5">WhatsApp Access Token</label>
+                <input type="password" name="whatsapp_token" id="int-wa-token"
+                       class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                       placeholder="EAAxxxxxxx...">
+              </div>
+            </div>
+          </div>
+
+          {# Vapi #}
+          <div class="p-4 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-3">Vapi Voice Configuration</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-slate-600 mb-1.5">Vapi API Key</label>
+                <input type="password" name="vapi_api_key" id="int-vapi-key"
+                       class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                       placeholder="vapi_xxxxxxx">
+              </div>
+              <div>
+                <label class="block text-sm text-slate-600 mb-1.5">Vapi Assistant ID</label>
+                <input type="text" name="vapi_assistant_id" id="int-vapi-assistant"
+                       class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                       placeholder="asst_xxxxxxx">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ========== Submit bar ========== #}
+      <div class="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+        <a href="/admin/businesses" class="text-sm text-slate-500 hover:text-slate-700 transition">Cancel</a>
+        <button type="submit" id="save-btn"
+                class="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-60">
+          <span id="save-btn-text">{{ 'Update Business' if business_id else 'Create Business' }}</span>
+          <span id="save-spinner" class="spinner hidden"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var businessId = {{ business_id | tojson if business_id else 'null' }};
+  var serviceAreas = [];
+  var services = [];
+
+  /* ---- Color picker sync ---- */
+  document.getElementById('brand-color').addEventListener('input', function() {
+    document.getElementById('brand-color-hex').value = this.value;
+  });
+
+  /* ---- Service Areas ---- */
+  function addServiceArea(type) {
+    if (type === 'zip') {
+      var zip = document.getElementById('new-zip').value.trim();
+      if (!zip) return;
+      serviceAreas.push({ type: 'zip', zip_code: zip });
+      document.getElementById('new-zip').value = '';
+    } else {
+      var city = document.getElementById('new-city').value.trim();
+      var state = document.getElementById('new-state').value.trim();
+      if (!city || !state) return;
+      serviceAreas.push({ type: 'city', city: city, state: state });
+      document.getElementById('new-city').value = '';
+      document.getElementById('new-state').value = '';
+    }
+    renderServiceAreas();
+  }
+
+  function removeServiceArea(idx) {
+    serviceAreas.splice(idx, 1);
+    renderServiceAreas();
+  }
+
+  function renderServiceAreas() {
+    var el = document.getElementById('service-areas-list');
+    if (serviceAreas.length === 0) {
+      el.innerHTML = '<p class="text-sm text-slate-400 italic">No service areas added yet.</p>';
+      return;
+    }
+    el.innerHTML = serviceAreas.map(function(sa, i) {
+      var label = sa.type === 'zip'
+        ? '<span class="badge badge-scheduled">ZIP</span> ' + esc(sa.zip_code)
+        : '<span class="badge badge-confirmed">City</span> ' + esc(sa.city) + ', ' + esc(sa.state);
+      return '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+        '<span class="text-sm text-slate-700">' + label + '</span>' +
+        '<button type="button" onclick="removeServiceArea(' + i + ')" class="text-red-400 hover:text-red-600 transition">' +
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+        '</button></div>';
+    }).join('');
+  }
+
+  /* ---- Services ---- */
+  var serviceCounter = 0;
+  function addService(data) {
+    serviceCounter++;
+    var id = 'svc-' + serviceCounter;
+    var s = data || { name: '', duration: 60, price_min: '', price_max: '', quotable: false };
+    var el = document.getElementById('services-list');
+    if (el.querySelector('.italic')) el.innerHTML = '';
+
+    var div = document.createElement('div');
+    div.id = id;
+    div.className = 'p-4 bg-gray-50 rounded-lg border border-gray-200';
+    div.innerHTML =
+      '<div class="flex items-center justify-between mb-3">' +
+        '<span class="text-sm font-medium text-slate-700">Service #' + serviceCounter + '</span>' +
+        '<button type="button" onclick="this.closest(\'[id^=svc-]\').remove()" class="text-red-400 hover:text-red-600">' +
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">' +
+        '<div class="lg:col-span-2"><input type="text" placeholder="Service name" value="' + esc(s.name) + '" class="svc-name w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"></div>' +
+        '<div><input type="number" placeholder="Duration (min)" value="' + (s.duration || '') + '" class="svc-duration w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"></div>' +
+        '<div><input type="number" step="0.01" placeholder="Price min" value="' + (s.price_min || '') + '" class="svc-price-min w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"></div>' +
+        '<div><input type="number" step="0.01" placeholder="Price max" value="' + (s.price_max || '') + '" class="svc-price-max w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"></div>' +
+      '</div>' +
+      '<label class="flex items-center gap-2 mt-3 cursor-pointer">' +
+        '<input type="checkbox" class="svc-quotable w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"' + (s.quotable ? ' checked' : '') + '>' +
+        '<span class="text-sm text-slate-600">Quotable (can provide price estimates)</span>' +
+      '</label>';
+    el.appendChild(div);
+  }
+
+  function collectServices() {
+    var items = [];
+    document.querySelectorAll('[id^=svc-]').forEach(function(el) {
+      items.push({
+        name: el.querySelector('.svc-name').value.trim(),
+        duration: parseInt(el.querySelector('.svc-duration').value) || 60,
+        price_min: parseFloat(el.querySelector('.svc-price-min').value) || null,
+        price_max: parseFloat(el.querySelector('.svc-price-max').value) || null,
+        quotable: el.querySelector('.svc-quotable').checked
+      });
+    });
+    return items.filter(function(s) { return s.name; });
+  }
+
+  /* ---- Business Hours ---- */
+  function toggleDayClosed(checkbox) {
+    var row = checkbox.closest('[data-day]');
+    var times = row.querySelector('.day-times');
+    if (checkbox.checked) {
+      times.style.opacity = '0.3';
+      times.style.pointerEvents = 'none';
+    } else {
+      times.style.opacity = '1';
+      times.style.pointerEvents = 'auto';
+    }
+  }
+
+  function collectHours() {
+    var hours = {};
+    document.querySelectorAll('[data-day]').forEach(function(row) {
+      var day = row.getAttribute('data-day').toLowerCase();
+      var closed = row.querySelector('.day-closed').checked;
+      hours[day] = {
+        closed: closed,
+        open: closed ? null : row.querySelector('.day-open').value,
+        close: closed ? null : row.querySelector('.day-close').value
+      };
+    });
+    return hours;
+  }
+
+  /* ---- Google Calendar ---- */
+  function connectGoogleCalendar() {
+    showToast('Google Calendar OAuth flow would open here', 'info');
+  }
+
+  /* ---- Save Business ---- */
+  function saveBusiness(e) {
+    e.preventDefault();
+    var btn = document.getElementById('save-btn');
+    var btnText = document.getElementById('save-btn-text');
+    var spinner = document.getElementById('save-spinner');
+    btn.disabled = true;
+    btnText.textContent = 'Saving...';
+    spinner.classList.remove('hidden');
+
+    var payload = {
+      name: document.getElementById('business-name').value.trim(),
+      slug: document.getElementById('business-slug').value.trim(),
+      industry: document.getElementById('business-industry').value,
+      phone: document.getElementById('business-phone').value.trim() || null,
+      email: document.getElementById('business-email').value.trim() || null,
+      website: document.getElementById('business-website').value.trim() || null,
+      timezone: document.getElementById('business-timezone').value,
+      is_active: document.getElementById('business-active').checked,
+      service_areas: serviceAreas,
+      services: collectServices(),
+      business_hours: collectHours(),
+      branding: {
+        primary_color: document.getElementById('brand-color').value,
+        logo_url: document.getElementById('brand-logo').value.trim() || null,
+        welcome_message: document.getElementById('brand-welcome').value.trim() || null
+      },
+      integrations: {
+        slack_webhook_url: document.getElementById('int-slack').value.trim() || null,
+        notification_emails: document.getElementById('int-emails').value.trim() || null,
+        notification_phone: document.getElementById('int-phone').value.trim() || null,
+        whatsapp_phone_id: document.getElementById('int-wa-phone').value.trim() || null,
+        whatsapp_token: document.getElementById('int-wa-token').value.trim() || null,
+        vapi_api_key: document.getElementById('int-vapi-key').value.trim() || null,
+        vapi_assistant_id: document.getElementById('int-vapi-assistant').value.trim() || null
+      }
+    };
+
+    var url = businessId ? '/api/businesses/' + businessId : '/api/businesses';
+    var method = businessId ? 'PUT' : 'POST';
+
+    authFetch(url, { method: method, body: payload })
+      .then(function(res) {
+        if (!res.ok) return res.json().then(function(d) { throw new Error(d.detail || d.message || 'Save failed'); });
+        return res.json();
+      })
+      .then(function(data) {
+        showToast(businessId ? 'Business updated successfully' : 'Business created successfully', 'success');
+        if (!businessId && data.id) {
+          setTimeout(function() { window.location.href = '/admin/businesses/' + data.id + '/edit'; }, 800);
+        }
+      })
+      .catch(function(err) {
+        showToast(err.message || 'Failed to save business', 'error');
+      })
+      .finally(function() {
+        btn.disabled = false;
+        btnText.textContent = businessId ? 'Update Business' : 'Create Business';
+        spinner.classList.add('hidden');
+      });
+  }
+
+  /* ---- Load existing business data ---- */
+  function loadBusiness() {
+    if (!businessId) return;
+
+    authFetch('/api/businesses/' + businessId).then(function(res) {
+      if (!res.ok) throw new Error('Not found');
+      return res.json();
+    }).then(function(b) {
+      document.getElementById('business-name').value = b.name || '';
+      document.getElementById('business-slug').value = b.slug || '';
+      document.getElementById('business-slug').dataset.manual = '1';
+      document.getElementById('business-industry').value = b.industry || '';
+      document.getElementById('business-phone').value = b.phone || '';
+      document.getElementById('business-email').value = b.email || '';
+      document.getElementById('business-website').value = b.website || '';
+      document.getElementById('business-timezone').value = b.timezone || 'America/New_York';
+      document.getElementById('business-active').checked = b.is_active !== false;
+
+      /* Service areas */
+      serviceAreas = b.service_areas || [];
+      renderServiceAreas();
+
+      /* Services */
+      (b.services || []).forEach(function(s) { addService(s); });
+
+      /* Hours */
+      var hours = b.business_hours || {};
+      Object.keys(hours).forEach(function(day) {
+        var row = document.querySelector('[data-day="' + day.charAt(0).toUpperCase() + day.slice(1) + '"]');
+        if (!row) return;
+        var h = hours[day];
+        if (h.closed) {
+          row.querySelector('.day-closed').checked = true;
+          toggleDayClosed(row.querySelector('.day-closed'));
+        }
+        if (h.open) row.querySelector('.day-open').value = h.open;
+        if (h.close) row.querySelector('.day-close').value = h.close;
+      });
+
+      /* Branding */
+      var branding = b.branding || {};
+      if (branding.primary_color) {
+        document.getElementById('brand-color').value = branding.primary_color;
+        document.getElementById('brand-color-hex').value = branding.primary_color;
+      }
+      document.getElementById('brand-logo').value = branding.logo_url || '';
+      document.getElementById('brand-welcome').value = branding.welcome_message || '';
+
+      /* Integrations */
+      var integ = b.integrations || {};
+      document.getElementById('int-slack').value = integ.slack_webhook_url || '';
+      document.getElementById('int-emails').value = integ.notification_emails || '';
+      document.getElementById('int-phone').value = integ.notification_phone || '';
+      document.getElementById('int-wa-phone').value = integ.whatsapp_phone_id || '';
+      document.getElementById('int-wa-token').value = integ.whatsapp_token || '';
+      document.getElementById('int-vapi-key').value = integ.vapi_api_key || '';
+      document.getElementById('int-vapi-assistant').value = integ.vapi_assistant_id || '';
+
+    }).catch(function(err) {
+      showToast('Failed to load business details', 'error');
+    });
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.addEventListener('DOMContentLoaded', loadBusiness);
+</script>
+{% endblock %}

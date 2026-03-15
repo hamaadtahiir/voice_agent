@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% set active_page = "appointments" %}
+
+{% block title %}Appointments - InboundBot Admin{% endblock %}
+{% block page_title %}Appointments{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  {# ---- Header ---- #}
+  <div>
+    <h2 class="text-xl font-bold text-slate-800">Appointments</h2>
+    <p class="text-sm text-slate-500">View and manage scheduled appointments</p>
+  </div>
+
+  {# ---- Filters ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Business</label>
+        <select id="filter-business" onchange="loadAppointments(1)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Businesses</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+        <select id="filter-status" onchange="loadAppointments(1)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Statuses</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="no_show">No Show</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">From</label>
+        <input type="date" id="filter-date-from" onchange="loadAppointments(1)"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">To</label>
+        <input type="date" id="filter-date-to" onchange="loadAppointments(1)"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+      </div>
+    </div>
+  </div>
+
+  {# ---- Table ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200">
+            <th class="px-5 py-3">Date / Time</th>
+            <th class="px-5 py-3">Lead</th>
+            <th class="px-5 py-3">Service</th>
+            <th class="px-5 py-3">Duration</th>
+            <th class="px-5 py-3">Status</th>
+            <th class="px-5 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="appointments-tbody" class="divide-y divide-gray-100">
+          <tr>
+            <td colspan="6" class="px-5 py-12 text-center text-slate-400">
+              <div class="spinner spinner-lg mx-auto mb-3"></div>
+              Loading appointments...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# Pagination #}
+    <div id="appt-pagination" class="px-5 py-3 border-t border-gray-200 flex items-center justify-between text-sm text-slate-500">
+      <span id="appt-count">--</span>
+      <div class="flex gap-1" id="appt-pages"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var currentPage = 1;
+  var perPage = 20;
+
+  function loadBusinessFilter() {
+    authFetch('/api/businesses').then(function(res) { return res.json(); })
+      .then(function(data) {
+        var select = document.getElementById('filter-business');
+        var businesses = data.items || data.businesses || data || [];
+        businesses.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name;
+          select.appendChild(opt);
+        });
+      }).catch(function() {});
+  }
+
+  function loadAppointments(page) {
+    page = page || 1;
+    currentPage = page;
+
+    var params = new URLSearchParams();
+    var biz = document.getElementById('filter-business').value;
+    var status = document.getElementById('filter-status').value;
+    var dateFrom = document.getElementById('filter-date-from').value;
+    var dateTo = document.getElementById('filter-date-to').value;
+
+    if (biz) params.set('business_id', biz);
+    if (status) params.set('status', status);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    params.set('page', page);
+    params.set('per_page', perPage);
+
+    var tbody = document.getElementById('appointments-tbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-slate-400"><div class="spinner spinner-lg mx-auto mb-3"></div>Loading...</td></tr>';
+
+    authFetch('/api/appointments?' + params.toString())
+      .then(function(res) {
+        if (!res.ok) throw new Error('Failed');
+        return res.json();
+      })
+      .then(function(data) {
+        var appts = data.items || data.appointments || data || [];
+        var total = data.total || appts.length;
+        var totalPages = Math.ceil(total / perPage) || 1;
+
+        document.getElementById('appt-count').textContent =
+          total > 0
+            ? 'Showing ' + ((page - 1) * perPage + 1) + '-' + Math.min(page * perPage, total) + ' of ' + total + ' appointments'
+            : '0 appointments';
+
+        if (appts.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-slate-400">No appointments found matching your filters.</td></tr>';
+          document.getElementById('appt-pages').innerHTML = '';
+          return;
+        }
+
+        tbody.innerHTML = appts.map(function(a) {
+          var statusBadge = 'badge badge-' + (a.status || 'scheduled');
+          var dateStr = formatDateTime(a.scheduled_start || a.start_time || a.date);
+          var duration = a.duration_minutes || a.duration || '--';
+          var leadName = a.lead_name || (a.lead && a.lead.name) || 'N/A';
+          var service = a.service_name || a.service || 'N/A';
+
+          /* Action buttons based on current status */
+          var actions = buildActionButtons(a);
+
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-5 py-3.5 text-slate-700 whitespace-nowrap">' + dateStr + '</td>' +
+            '<td class="px-5 py-3.5"><span class="font-medium text-slate-800">' + esc(leadName) + '</span></td>' +
+            '<td class="px-5 py-3.5 text-slate-600">' + esc(service) + '</td>' +
+            '<td class="px-5 py-3.5 text-slate-600">' + duration + ' min</td>' +
+            '<td class="px-5 py-3.5"><span class="' + statusBadge + '">' + esc(a.status || 'scheduled').replace('_', ' ') + '</span></td>' +
+            '<td class="px-5 py-3.5 text-right">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+
+        renderPagination(totalPages, page);
+      })
+      .catch(function() {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-red-500">Failed to load appointments.</td></tr>';
+      });
+  }
+
+  function buildActionButtons(appt) {
+    var st = appt.status || 'scheduled';
+    var id = appt.id;
+    var btnBase = 'px-2.5 py-1 text-xs font-medium rounded-md transition ';
+    var html = '<div class="flex items-center justify-end gap-1.5 flex-wrap">';
+
+    if (st === 'scheduled') {
+      html += '<button onclick="updateApptStatus(\'' + id + '\',\'confirmed\')" class="' + btnBase + 'bg-green-50 text-green-700 hover:bg-green-100">Confirm</button>';
+      html += '<button onclick="updateApptStatus(\'' + id + '\',\'cancelled\')" class="' + btnBase + 'bg-red-50 text-red-700 hover:bg-red-100">Cancel</button>';
+    } else if (st === 'confirmed') {
+      html += '<button onclick="updateApptStatus(\'' + id + '\',\'completed\')" class="' + btnBase + 'bg-slate-100 text-slate-700 hover:bg-slate-200">Complete</button>';
+      html += '<button onclick="updateApptStatus(\'' + id + '\',\'no_show\')" class="' + btnBase + 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100">No-show</button>';
+      html += '<button onclick="updateApptStatus(\'' + id + '\',\'cancelled\')" class="' + btnBase + 'bg-red-50 text-red-700 hover:bg-red-100">Cancel</button>';
+    } else if (st === 'completed' || st === 'cancelled' || st === 'no_show') {
+      html += '<span class="text-xs text-slate-400">No actions</span>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function updateApptStatus(id, newStatus) {
+    var label = newStatus.replace('_', ' ');
+    if (!confirm('Change appointment status to "' + label + '"?')) return;
+
+    authFetch('/api/appointments/' + id, {
+      method: 'PUT',
+      body: { status: newStatus }
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    })
+    .then(function() {
+      showToast('Appointment marked as "' + label + '"', 'success');
+      loadAppointments(currentPage);
+    })
+    .catch(function() {
+      showToast('Failed to update appointment', 'error');
+    });
+  }
+
+  function renderPagination(totalPages, current) {
+    var container = document.getElementById('appt-pages');
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+    var html = '';
+    var btnCls = 'px-3 py-1 rounded text-sm font-medium transition ';
+    var activeCls = btnCls + 'bg-blue-600 text-white';
+    var inactiveCls = btnCls + 'bg-gray-100 hover:bg-gray-200 text-slate-600';
+
+    if (current > 1) {
+      html += '<button onclick="loadAppointments(' + (current - 1) + ')" class="' + inactiveCls + '">&laquo;</button>';
+    }
+
+    var start = Math.max(1, current - 2);
+    var end = Math.min(totalPages, current + 2);
+    for (var i = start; i <= end; i++) {
+      html += '<button onclick="loadAppointments(' + i + ')" class="' + (i === current ? activeCls : inactiveCls) + '">' + i + '</button>';
+    }
+
+    if (current < totalPages) {
+      html += '<button onclick="loadAppointments(' + (current + 1) + ')" class="' + inactiveCls + '">&raquo;</button>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadBusinessFilter();
+    loadAppointments(1);
+  });
+</script>
+{% endblock %}

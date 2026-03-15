@@ -1,0 +1,22 @@
+(function() {
+    /* Inbound Bot Widget Loader for {{ business_name }} */
+    if (window.__INBOUND_BOT_CONFIG__) return; /* prevent double-load */
+
+    window.__INBOUND_BOT_CONFIG__ = {
+        businessSlug: "{{ slug }}",
+        businessName: "{{ business_name }}",
+        wsUrl: "{{ ws_url }}",
+        primaryColor: "{{ primary_color | default('#1e40af') }}",
+        welcomeMessage: "{{ welcome_message | default('Hi! How can we help you today?') }}",
+        position: "{{ position | default('bottom-right') }}",
+        soundEnabled: {{ sound_enabled | default('true') | lower }}
+    };
+
+    var script = document.createElement('script');
+    script.src = "{{ base_url }}/widget-assets/widget.js";
+    script.async = true;
+    script.onerror = function() {
+        console.error('[InboundBot] Failed to load chat widget script.');
+    };
+    document.body.appendChild(script);
+})();

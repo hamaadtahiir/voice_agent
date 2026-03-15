@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Roofing - Chat Widget Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+        header {
+            background: #1e40af;
+            color: white;
+            padding: 1.5rem 2rem;
+        }
+        header h1 { font-size: 1.75rem; font-weight: 700; }
+        header p { margin-top: 0.25rem; opacity: 0.85; font-size: 0.95rem; }
+        main {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #1e40af;
+        }
+        .card p, .card li {
+            line-height: 1.7;
+            color: #475569;
+        }
+        .card ul { padding-left: 1.5rem; }
+        .card li { margin-bottom: 0.5rem; }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #be123c;
+        }
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .service-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .service-card h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+        .service-card p { font-size: 0.85rem; color: #64748b; }
+        .badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Apex Roofing Co</h1>
+        <p>Professional roofing services for the greater NYC area</p>
+    </header>
+
+    <main>
+        <div class="card">
+            <h2>Chat Widget Test Page</h2>
+            <p>
+                This page simulates a business website with the Inbound Bot chat widget embedded.
+                Click the <strong>chat button</strong> in the bottom-right corner to start a conversation.
+            </p>
+            <ul>
+                <li>The bot will greet you and ask for your <strong>location</strong> (try zip code <code>10001</code>)</li>
+                <li>It will check if you're in the service area</li>
+                <li>Ask about your <strong>roofing issue</strong> (e.g. "My roof is leaking")</li>
+                <li>Identify the right service and offer a <strong>quote range</strong></li>
+                <li>Help you <strong>schedule an appointment</strong></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Our Services</h2>
+            <div class="services-grid">
+                <div class="service-card">
+                    <h3>Roof Inspection</h3>
+                    <p>60 min &bull; Free</p>
+                </div>
+                <div class="service-card">
+                    <h3>Roof Repair</h3>
+                    <p>120 min &bull; $300 - $2,500</p>
+                    <span class="badge">Instant Quote</span>
+                </div>
+                <div class="service-card">
+                    <h3>Roof Replacement</h3>
+                    <p>90 min &bull; $5,000 - $25,000</p>
+                    <span class="badge">Instant Quote</span>
+                </div>
+                <div class="service-card">
+                    <h3>Gutter Cleaning</h3>
+                    <p>60 min &bull; $100 - $400</p>
+                    <span class="badge">Instant Quote</span>
+                </div>
+                <div class="service-card">
+                    <h3>Emergency Leak Repair</h3>
+                    <p>60 min &bull; $200 - $1,500</p>
+                    <span class="badge">Instant Quote</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Service Areas</h2>
+            <p>We serve the following zip codes in the NYC metro area:</p>
+            <p style="margin-top: 0.5rem;">
+                <code>10001</code> <code>10002</code> <code>10003</code> <code>10004</code> <code>10005</code>
+                <code>11201</code> <code>11211</code> <code>07001</code> <code>07002</code> <code>07003</code>
+            </p>
+        </div>
+    </main>
+
+    <footer>
+        Inbound Bot &mdash; Chat Widget Test Page
+    </footer>
+
+    <!-- Inbound Bot Chat Widget -->
+    <script src="http://localhost:8000/widget/apex-roofing.js" async></script>
+</body>
+</html>

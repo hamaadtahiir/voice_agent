@@ -1,0 +1,39 @@
+app = "inbound-bot"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
+[env]
+  LOG_LEVEL = "INFO"
+  DEBUG = "true"
+  DATABASE_URL = "sqlite+aiosqlite:////data/inbound_bot.db"
+
+[[mounts]]
+  source = "inbound_bot_data"
+  destination = "/data"
+
+[checks]
+  [checks.health]
+    grace_period = "10s"
+    interval = "30s"
+    method = "get"
+    path = "/health"
+    port = 8000
+    timeout = "5s"
+    type = "http"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

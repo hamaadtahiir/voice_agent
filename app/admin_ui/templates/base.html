@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin Panel{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/admin.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full bg-gray-50 text-slate-800 antialiased">
+
+  {% block body %}
+  <div class="flex h-full">
+
+    {# -------- Sidebar Overlay (mobile) -------- #}
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    {# -------- Sidebar -------- #}
+    <aside id="sidebar" class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 md:relative md:translate-x-0">
+      {# Logo / Brand #}
+      <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-700/50">
+        <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg">IB</div>
+        <span class="text-white font-semibold text-lg tracking-tight">InboundBot</span>
+      </div>
+
+      {# Navigation #}
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <a href="/admin/dashboard"
+           class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4"/>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/admin/businesses"
+           class="sidebar-link {% if active_page == 'businesses' %}active{% endif %}">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3m4-10h2m4 0h2m-6 4h2m4 0h2"/>
+          </svg>
+          Businesses
+        </a>
+        <a href="/admin/leads"
+           class="sidebar-link {% if active_page == 'leads' %}active{% endif %}">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 10-8 0 4 4 0 008 0zm6 4a4 4 0 10-8 0"/>
+          </svg>
+          Leads
+        </a>
+        <a href="/admin/appointments"
+           class="sidebar-link {% if active_page == 'appointments' %}active{% endif %}">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Appointments
+        </a>
+      </nav>
+
+      {# Sidebar footer #}
+      <div class="px-4 py-3 border-t border-slate-700/50 text-xs text-slate-500">
+        InboundBot Admin v1.0
+      </div>
+    </aside>
+
+    {# -------- Main Area -------- #}
+    <div class="flex-1 flex flex-col min-w-0">
+
+      {# Top bar #}
+      <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0">
+        {# Mobile hamburger #}
+        <button onclick="toggleSidebar()" class="md:hidden p-2 -ml-2 text-slate-600 hover:text-slate-900">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-semibold text-slate-800 hidden md:block">{% block page_title %}{% endblock %}</h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <span id="admin-name" class="text-sm text-slate-600 hidden sm:inline"></span>
+          <button onclick="logout()"
+                  class="text-sm text-slate-500 hover:text-red-600 transition flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"/>
+            </svg>
+            Logout
+          </button>
+        </div>
+      </header>
+
+      {# Page Content #}
+      <main class="flex-1 overflow-y-auto p-4 md:p-6">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  {% endblock %}
+
+  {# Toast container #}
+  <div id="toast-container"></div>
+
+  <script src="/static/admin.js"></script>
+
+  {# Load admin name #}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var nameEl = document.getElementById('admin-name');
+      if (nameEl) {
+        authFetch('/api/admin/me').then(function(res) {
+          if (res.ok) return res.json();
+          return null;
+        }).then(function(data) {
+          if (data && data.name) {
+            nameEl.textContent = data.name;
+          } else if (data && data.email) {
+            nameEl.textContent = data.email;
+          }
+        }).catch(function() {});
+      }
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

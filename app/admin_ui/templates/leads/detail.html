@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% set active_page = "leads" %}
+
+{% block title %}Lead Detail - InboundBot Admin{% endblock %}
+{% block page_title %}Lead Detail{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  {# ---- Back link ---- #}
+  <div class="flex items-center gap-3">
+    <a href="/admin/leads" class="text-slate-400 hover:text-slate-600 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <h2 class="text-xl font-bold text-slate-800" id="lead-heading">Lead Detail</h2>
+  </div>
+
+  {# ---- Two-column top section ---- #}
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    {# Left: Lead Info Card #}
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6" id="lead-info-card">
+      <div class="flex items-center justify-center py-8 text-slate-400">
+        <div class="spinner spinner-lg mr-3"></div>
+        Loading lead details...
+      </div>
+    </div>
+
+    {# Right: Actions #}
+    <div class="space-y-4">
+      {# Status Change #}
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3">Actions</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Change Status</label>
+            <select id="status-select"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="qualified">Qualified</option>
+              <option value="unqualified">Unqualified</option>
+              <option value="converted">Converted</option>
+              <option value="lost">Lost</option>
+            </select>
+          </div>
+          <button onclick="updateLeadStatus()" id="status-update-btn"
+                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+            Update Status
+          </button>
+        </div>
+      </div>
+
+      {# Notes #}
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3">Add Note</h3>
+        <textarea id="lead-note" rows="3" placeholder="Write a note..."
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition resize-y mb-2"></textarea>
+        <button onclick="addLeadNote()"
+                class="w-full px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-sm font-medium text-slate-700 rounded-lg transition">
+          Save Note
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Conversation Transcript ---- #}
+  <div class="bg-white rounded-xl border border-gray-200">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h3 class="text-sm font-semibold text-slate-700">Conversation Transcript</h3>
+    </div>
+    <div id="conversation-area" class="p-6">
+      <div class="flex items-center justify-center py-8 text-slate-400">
+        <div class="spinner spinner-lg mr-3"></div>
+        Loading conversation...
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var leadId = {{ lead_id | tojson }};
+  var leadData = null;
+
+  function loadLeadDetail() {
+    authFetch('/api/leads/' + leadId)
+      .then(function(res) {
+        if (!res.ok) throw new Error('Not found');
+        return res.json();
+      })
+      .then(function(lead) {
+        leadData = lead;
+        renderLeadInfo(lead);
+        document.getElementById('status-select').value = lead.status || 'new';
+        document.getElementById('lead-heading').textContent = lead.name || lead.contact_name || 'Lead #' + leadId;
+      })
+      .catch(function() {
+        document.getElementById('lead-info-card').innerHTML =
+          '<div class="text-center py-8 text-red-500">Failed to load lead details.</div>';
+      });
+  }
+
+  function renderLeadInfo(lead) {
+    var scoreVal = lead.qualification_score != null ? lead.qualification_score : (lead.score != null ? lead.score : null);
+    var scoreCls = scoreBgClass(scoreVal);
+    var statusBadge = 'badge badge-' + (lead.status || 'new');
+
+    var html = '';
+
+    /* Header row */
+    html += '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">';
+    html += '<div>';
+    html += '<h3 class="text-lg font-bold text-slate-800">' + esc(lead.name || lead.contact_name || 'Unknown') + '</h3>';
+    if (lead.email) html += '<p class="text-sm text-slate-500 mt-0.5">' + esc(lead.email) + '</p>';
+    if (lead.phone) html += '<p class="text-sm text-slate-500">' + esc(lead.phone) + '</p>';
+    html += '</div>';
+    html += '<span class="' + statusBadge + '">' + esc(lead.status || 'new') + '</span>';
+    html += '</div>';
+
+    /* Details grid */
+    html += '<div class="grid grid-cols-2 sm:grid-cols-3 gap-4">';
+
+    /* Channel */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Channel</p>';
+    html += '<p class="text-sm text-slate-700 mt-1 capitalize">' + esc((lead.channel || 'N/A').replace('_', ' ')) + '</p>';
+    html += '</div>';
+
+    /* Service */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Service Needed</p>';
+    html += '<p class="text-sm text-slate-700 mt-1">' + esc(lead.service_needed || lead.service || 'N/A') + '</p>';
+    html += '</div>';
+
+    /* Location */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Location</p>';
+    html += '<p class="text-sm text-slate-700 mt-1">' + esc(lead.location || lead.zip_code || lead.city || 'N/A') + '</p>';
+    html += '</div>';
+
+    /* Score */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Score</p>';
+    if (scoreVal != null) {
+      html += '<p class="mt-1"><span class="' + scoreCls + ' text-sm font-bold px-2.5 py-1 rounded-full">' + scoreVal + '</span></p>';
+    } else {
+      html += '<p class="text-sm text-slate-700 mt-1">N/A</p>';
+    }
+    html += '</div>';
+
+    /* Created */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Created</p>';
+    html += '<p class="text-sm text-slate-700 mt-1">' + formatDateTime(lead.created_at) + '</p>';
+    html += '</div>';
+
+    /* Business */
+    html += '<div>';
+    html += '<p class="text-xs font-medium text-slate-400 uppercase">Business</p>';
+    html += '<p class="text-sm text-slate-700 mt-1">' + esc(lead.business_name || lead.business?.name || 'N/A') + '</p>';
+    html += '</div>';
+
+    html += '</div>';
+
+    /* Score breakdown */
+    var breakdown = lead.score_breakdown || lead.qualification_details || null;
+    if (breakdown) {
+      html += '<div class="mt-6 pt-4 border-t border-gray-100">';
+      html += '<p class="text-xs font-medium text-slate-400 uppercase mb-2">Score Breakdown</p>';
+      html += '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">';
+      if (typeof breakdown === 'object') {
+        Object.keys(breakdown).forEach(function(key) {
+          html += '<div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">';
+          html += '<span class="text-xs text-slate-600 capitalize">' + esc(key.replace(/_/g, ' ')) + '</span>';
+          html += '<span class="text-xs font-semibold text-slate-700">' + breakdown[key] + '</span>';
+          html += '</div>';
+        });
+      }
+      html += '</div></div>';
+    }
+
+    /* Notes */
+    if (lead.notes && lead.notes.length) {
+      html += '<div class="mt-6 pt-4 border-t border-gray-100">';
+      html += '<p class="text-xs font-medium text-slate-400 uppercase mb-2">Notes</p>';
+      html += '<div class="space-y-2">';
+      lead.notes.forEach(function(n) {
+        html += '<div class="bg-gray-50 rounded-lg p-3">';
+        html += '<p class="text-sm text-slate-700">' + esc(n.content || n.text || n) + '</p>';
+        if (n.created_at) html += '<p class="text-xs text-slate-400 mt-1">' + formatDateTime(n.created_at) + '</p>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    document.getElementById('lead-info-card').innerHTML = html;
+  }
+
+  function loadConversation() {
+    authFetch('/api/leads/' + leadId + '/conversations')
+      .then(function(res) {
+        if (!res.ok) throw new Error('Failed');
+        return res.json();
+      })
+      .then(function(data) {
+        var conversations = data.conversations || data.items || data || [];
+        renderConversation(conversations);
+      })
+      .catch(function() {
+        document.getElementById('conversation-area').innerHTML =
+          '<div class="text-center py-8 text-slate-400">No conversation data available.</div>';
+      });
+  }
+
+  function renderConversation(conversations) {
+    var area = document.getElementById('conversation-area');
+
+    if (!conversations || conversations.length === 0) {
+      area.innerHTML = '<div class="text-center py-8 text-slate-400">No messages yet.</div>';
+      return;
+    }
+
+    var html = '';
+
+    conversations.forEach(function(conv) {
+      var messages = conv.messages || conv || [];
+      if (!Array.isArray(messages)) messages = [messages];
+
+      /* Conversation header if multiple */
+      if (conversations.length > 1 && conv.id) {
+        html += '<div class="mb-2 text-xs font-medium text-slate-400 uppercase">Conversation #' + conv.id + '</div>';
+      }
+
+      html += '<div class="flex flex-col gap-3 mb-6">';
+
+      messages.forEach(function(msg) {
+        var role = msg.role || msg.sender || 'system';
+        var content = msg.content || msg.text || msg.body || '';
+        var timestamp = msg.created_at || msg.timestamp || '';
+
+        if (role === 'user' || role === 'customer' || role === 'human') {
+          html += '<div class="flex flex-col items-start">';
+          html += '<div class="chat-bubble chat-bubble-user">' + esc(content) + '</div>';
+          if (timestamp) html += '<div class="chat-timestamp ml-1">' + formatDateTime(timestamp) + '</div>';
+          html += '</div>';
+        } else if (role === 'assistant' || role === 'bot' || role === 'ai') {
+          html += '<div class="flex flex-col items-end">';
+          html += '<div class="chat-bubble chat-bubble-assistant">' + esc(content) + '</div>';
+          if (timestamp) html += '<div class="chat-timestamp mr-1">' + formatDateTime(timestamp) + '</div>';
+          html += '</div>';
+        } else {
+          /* System / tool messages */
+          html += '<div class="flex flex-col items-center">';
+          html += '<div class="chat-bubble chat-bubble-system">' + esc(content) + '</div>';
+          if (timestamp) html += '<div class="chat-timestamp">' + formatDateTime(timestamp) + '</div>';
+          html += '</div>';
+        }
+
+        /* Media attachments */
+        if (msg.media_url || msg.attachment_url) {
+          var mediaUrl = msg.media_url || msg.attachment_url;
+          var isUser = (role === 'user' || role === 'customer' || role === 'human');
+          html += '<div class="flex ' + (isUser ? 'justify-start' : 'justify-end') + ' mt-1">';
+          html += '<img src="' + esc(mediaUrl) + '" alt="Attachment" class="media-thumb" onerror="this.style.display=\'none\'">';
+          html += '</div>';
+        }
+      });
+
+      html += '</div>';
+    });
+
+    area.innerHTML = html;
+
+    /* Scroll to bottom */
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function updateLeadStatus() {
+    var status = document.getElementById('status-select').value;
+    var btn = document.getElementById('status-update-btn');
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    authFetch('/api/leads/' + leadId, {
+      method: 'PUT',
+      body: { status: status }
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    })
+    .then(function() {
+      showToast('Status updated to "' + status + '"', 'success');
+      loadLeadDetail();
+    })
+    .catch(function() {
+      showToast('Failed to update status', 'error');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Update Status';
+    });
+  }
+
+  function addLeadNote() {
+    var note = document.getElementById('lead-note').value.trim();
+    if (!note) { showToast('Please enter a note', 'error'); return; }
+
+    authFetch('/api/leads/' + leadId, {
+      method: 'PUT',
+      body: { note: note }
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    })
+    .then(function() {
+      showToast('Note added', 'success');
+      document.getElementById('lead-note').value = '';
+      loadLeadDetail();
+    })
+    .catch(function() {
+      showToast('Failed to add note', 'error');
+    });
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadLeadDetail();
+    loadConversation();
+  });
+</script>
+{% endblock %}

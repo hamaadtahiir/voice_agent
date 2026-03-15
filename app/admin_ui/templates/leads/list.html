@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% set active_page = "leads" %}
+
+{% block title %}Leads - InboundBot Admin{% endblock %}
+{% block page_title %}Leads{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  {# ---- Header ---- #}
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-slate-800">Leads</h2>
+      <p class="text-sm text-slate-500">View and manage all inbound leads</p>
+    </div>
+    <button onclick="exportLeads()" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-sm font-medium text-slate-700 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+      </svg>
+      Export
+    </button>
+  </div>
+
+  {# ---- Filters ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Business</label>
+        <select id="filter-business" onchange="loadLeads(1)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Businesses</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+        <select id="filter-status" onchange="loadLeads(1)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="unqualified">Unqualified</option>
+          <option value="converted">Converted</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Channel</label>
+        <select id="filter-channel" onchange="loadLeads(1)"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Channels</option>
+          <option value="web_chat">Web Chat</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="voice">Voice</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">From</label>
+        <input type="date" id="filter-date-from" onchange="loadLeads(1)"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">To</label>
+        <input type="date" id="filter-date-to" onchange="loadLeads(1)"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+      </div>
+    </div>
+  </div>
+
+  {# ---- Table ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200">
+            <th class="px-5 py-3">Name</th>
+            <th class="px-5 py-3">Channel</th>
+            <th class="px-5 py-3">Status</th>
+            <th class="px-5 py-3">Score</th>
+            <th class="px-5 py-3">Service</th>
+            <th class="px-5 py-3 hidden lg:table-cell">Location</th>
+            <th class="px-5 py-3 hidden md:table-cell">Last Message</th>
+            <th class="px-5 py-3">Created</th>
+          </tr>
+        </thead>
+        <tbody id="leads-tbody" class="divide-y divide-gray-100">
+          <tr>
+            <td colspan="8" class="px-5 py-12 text-center text-slate-400">
+              <div class="spinner spinner-lg mx-auto mb-3"></div>
+              Loading leads...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# Pagination #}
+    <div id="leads-pagination" class="px-5 py-3 border-t border-gray-200 flex items-center justify-between text-sm text-slate-500">
+      <span id="leads-count">--</span>
+      <div class="flex gap-1" id="leads-pages"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var currentPage = 1;
+  var perPage = 20;
+
+  /* Populate business filter */
+  function loadBusinessFilter() {
+    authFetch('/api/businesses').then(function(res) { return res.json(); })
+      .then(function(data) {
+        var select = document.getElementById('filter-business');
+        var businesses = data.items || data.businesses || data || [];
+        businesses.forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name;
+          select.appendChild(opt);
+        });
+
+        /* Pre-select from URL param */
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('business_id')) {
+          select.value = params.get('business_id');
+        }
+      }).catch(function() {});
+  }
+
+  function loadLeads(page) {
+    page = page || 1;
+    currentPage = page;
+
+    var params = new URLSearchParams();
+    var biz = document.getElementById('filter-business').value;
+    var status = document.getElementById('filter-status').value;
+    var channel = document.getElementById('filter-channel').value;
+    var dateFrom = document.getElementById('filter-date-from').value;
+    var dateTo = document.getElementById('filter-date-to').value;
+
+    if (biz) params.set('business_id', biz);
+    if (status) params.set('status', status);
+    if (channel) params.set('channel', channel);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    params.set('page', page);
+    params.set('per_page', perPage);
+
+    var tbody = document.getElementById('leads-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-slate-400"><div class="spinner spinner-lg mx-auto mb-3"></div>Loading...</td></tr>';
+
+    authFetch('/api/leads?' + params.toString())
+      .then(function(res) {
+        if (!res.ok) throw new Error('Failed');
+        return res.json();
+      })
+      .then(function(data) {
+        var leads = data.items || data.leads || data || [];
+        var total = data.total || leads.length;
+        var totalPages = Math.ceil(total / perPage) || 1;
+
+        document.getElementById('leads-count').textContent =
+          'Showing ' + ((page - 1) * perPage + 1) + '-' + Math.min(page * perPage, total) + ' of ' + total + ' leads';
+
+        if (leads.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-slate-400">No leads found matching your filters.</td></tr>';
+          document.getElementById('leads-count').textContent = '0 leads';
+          document.getElementById('leads-pages').innerHTML = '';
+          return;
+        }
+
+        tbody.innerHTML = leads.map(function(l) {
+          var scoreVal = l.qualification_score != null ? l.qualification_score : (l.score != null ? l.score : null);
+          var scoreCls = scoreBgClass(scoreVal);
+          var scoreText = scoreVal != null ? scoreVal : '--';
+          var statusBadge = 'badge badge-' + (l.status || 'new');
+          var channelLabel = (l.channel || 'N/A').replace('_', ' ');
+
+          return '<tr class="table-row-link" onclick="window.location.href=\'/admin/leads/' + l.id + '\'">' +
+            '<td class="px-5 py-3.5">' +
+              '<div class="font-medium text-slate-800">' + esc(l.name || l.contact_name || 'Unknown') + '</div>' +
+              (l.email || l.phone ? '<div class="text-xs text-slate-400 mt-0.5">' + esc(l.email || l.phone || '') + '</div>' : '') +
+            '</td>' +
+            '<td class="px-5 py-3.5 text-slate-600 capitalize">' + esc(channelLabel) + '</td>' +
+            '<td class="px-5 py-3.5"><span class="' + statusBadge + '">' + esc(l.status || 'new') + '</span></td>' +
+            '<td class="px-5 py-3.5"><span class="' + scoreCls + ' text-xs font-bold px-2 py-0.5 rounded-full">' + scoreText + '</span></td>' +
+            '<td class="px-5 py-3.5 text-slate-600">' + esc(l.service_needed || l.service || 'N/A') + '</td>' +
+            '<td class="px-5 py-3.5 text-slate-600 hidden lg:table-cell">' + esc(l.location || l.zip_code || 'N/A') + '</td>' +
+            '<td class="px-5 py-3.5 text-slate-500 hidden md:table-cell max-w-[200px] truncate">' + esc(l.last_message || '') + '</td>' +
+            '<td class="px-5 py-3.5 text-slate-500 whitespace-nowrap">' + relativeTime(l.created_at) + '</td>' +
+            '</tr>';
+        }).join('');
+
+        /* Pagination */
+        renderPagination(totalPages, page);
+      })
+      .catch(function(err) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-12 text-center text-red-500">Failed to load leads.</td></tr>';
+      });
+  }
+
+  function renderPagination(totalPages, current) {
+    var container = document.getElementById('leads-pages');
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+    var html = '';
+    var btnCls = 'px-3 py-1 rounded text-sm font-medium transition ';
+    var activeCls = btnCls + 'bg-blue-600 text-white';
+    var inactiveCls = btnCls + 'bg-gray-100 hover:bg-gray-200 text-slate-600';
+
+    /* Previous */
+    if (current > 1) {
+      html += '<button onclick="loadLeads(' + (current - 1) + ')" class="' + inactiveCls + '">&laquo;</button>';
+    }
+
+    /* Pages */
+    var start = Math.max(1, current - 2);
+    var end = Math.min(totalPages, current + 2);
+    for (var i = start; i <= end; i++) {
+      html += '<button onclick="loadLeads(' + i + ')" class="' + (i === current ? activeCls : inactiveCls) + '">' + i + '</button>';
+    }
+
+    /* Next */
+    if (current < totalPages) {
+      html += '<button onclick="loadLeads(' + (current + 1) + ')" class="' + inactiveCls + '">&raquo;</button>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function exportLeads() {
+    showToast('Export functionality coming soon', 'info');
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadBusinessFilter();
+    loadLeads(1);
+  });
+</script>
+{% endblock %}

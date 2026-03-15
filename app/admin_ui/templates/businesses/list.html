@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% set active_page = "businesses" %}
+
+{% block title %}Businesses - InboundBot Admin{% endblock %}
+{% block page_title %}Businesses{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  {# ---- Header + Actions ---- #}
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-bold text-slate-800">Businesses</h2>
+      <p class="text-sm text-slate-500">Manage onboarded businesses and their configurations</p>
+    </div>
+    <a href="/admin/businesses/new"
+       class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Add Business
+    </a>
+  </div>
+
+  {# ---- Search / Filters ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex-1">
+        <input type="text" id="search-name" placeholder="Search by name..."
+               oninput="filterBusinesses()"
+               class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm placeholder-slate-400
+                      focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+      </div>
+      <div class="sm:w-48">
+        <select id="filter-industry" onchange="filterBusinesses()"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
+                       focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+          <option value="">All Industries</option>
+          <option value="hvac">HVAC</option>
+          <option value="plumbing">Plumbing</option>
+          <option value="electrical">Electrical</option>
+          <option value="roofing">Roofing</option>
+          <option value="landscaping">Landscaping</option>
+          <option value="cleaning">Cleaning</option>
+          <option value="pest_control">Pest Control</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Table ---- #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200">
+            <th class="px-5 py-3">Name</th>
+            <th class="px-5 py-3">Industry</th>
+            <th class="px-5 py-3">Slug</th>
+            <th class="px-5 py-3">Phone</th>
+            <th class="px-5 py-3">Status</th>
+            <th class="px-5 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="businesses-tbody" class="divide-y divide-gray-100">
+          <tr>
+            <td colspan="6" class="px-5 py-12 text-center text-slate-400">
+              <div class="spinner spinner-lg mx-auto mb-3"></div>
+              Loading businesses...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var allBusinesses = [];
+
+  function loadBusinesses() {
+    authFetch('/api/businesses').then(function(res) {
+      if (!res.ok) throw new Error('Failed to load');
+      return res.json();
+    }).then(function(data) {
+      allBusinesses = data.items || data.businesses || data || [];
+      renderBusinesses(allBusinesses);
+    }).catch(function(err) {
+      document.getElementById('businesses-tbody').innerHTML =
+        '<tr><td colspan="6" class="px-5 py-12 text-center text-red-500">Failed to load businesses. Please try again.</td></tr>';
+      showToast('Failed to load businesses', 'error');
+    });
+  }
+
+  function filterBusinesses() {
+    var search = document.getElementById('search-name').value.toLowerCase().trim();
+    var industry = document.getElementById('filter-industry').value;
+
+    var filtered = allBusinesses.filter(function(b) {
+      var matchName = !search || (b.name || '').toLowerCase().indexOf(search) !== -1;
+      var matchIndustry = !industry || b.industry === industry;
+      return matchName && matchIndustry;
+    });
+
+    renderBusinesses(filtered);
+  }
+
+  function renderBusinesses(list) {
+    var tbody = document.getElementById('businesses-tbody');
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-12 text-center text-slate-400">No businesses found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map(function(b) {
+      var isActive = b.is_active !== false;
+      var statusBadge = isActive
+        ? '<span class="badge badge-qualified">Active</span>'
+        : '<span class="badge badge-lost">Inactive</span>';
+
+      return '<tr class="hover:bg-gray-50">' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="font-medium text-slate-800">' + esc(b.name) + '</div>' +
+          (b.email ? '<div class="text-xs text-slate-400 mt-0.5">' + esc(b.email) + '</div>' : '') +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-slate-600 capitalize">' + esc(b.industry || 'N/A') + '</td>' +
+        '<td class="px-5 py-3.5"><code class="text-xs bg-gray-100 px-2 py-0.5 rounded text-slate-600">' + esc(b.slug || '') + '</code></td>' +
+        '<td class="px-5 py-3.5 text-slate-600">' + esc(b.phone || 'N/A') + '</td>' +
+        '<td class="px-5 py-3.5">' + statusBadge + '</td>' +
+        '<td class="px-5 py-3.5 text-right">' +
+          '<div class="flex items-center justify-end gap-2">' +
+            '<a href="/admin/businesses/' + b.id + '/edit" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</a>' +
+            '<span class="text-gray-300">|</span>' +
+            '<a href="/admin/leads?business_id=' + b.id + '" class="text-slate-500 hover:text-slate-700 text-xs font-medium">Leads</a>' +
+          '</div>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.addEventListener('DOMContentLoaded', loadBusinesses);
+</script>
+{% endblock %}
