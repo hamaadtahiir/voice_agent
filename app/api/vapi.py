@@ -173,8 +173,8 @@ async def vapi_webhook(
 
     if payload_type == "assistant-request":
         return await _handle_assistant_request(message, db)
-    elif payload_type == "function-call":
-        return await _handle_function_call(message, db)
+    elif payload_type in ("function-call", "tool-calls"):
+        return await _handle_tool_calls(message, db)
     elif payload_type == "end-of-call-report":
         return await _handle_end_of_call_report(message, db)
     else:
@@ -204,12 +204,15 @@ async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
     return {"assistant": _build_assistant_config(business)}
 
 
-async def _handle_function_call(body: dict, db: AsyncSession) -> dict:
-    """Execute a tool call requested by the Vapi assistant."""
-    function_call = body.get("functionCall", body.get("function_call", {}))
-    fn_name = function_call.get("name", "")
-    params = function_call.get("parameters", {})
+async def _handle_tool_calls(body: dict, db: AsyncSession) -> dict:
+    """Execute tool calls requested by the Vapi assistant.
 
+    Vapi sends tool calls in body["toolCallList"] with each item having:
+      - id: tool call ID (must be returned in response)
+      - name: function name
+      - arguments: dict of parameters
+    Response format: {"results": [{"toolCallId": "...", "result": "..."}]}
+    """
     call_data = body.get("call", {})
     phone_number_id = call_data.get("phoneNumberId")
 
@@ -224,23 +227,45 @@ async def _handle_function_call(body: dict, db: AsyncSession) -> dict:
         )
         business = result.scalar_one_or_none()
 
-    if fn_name == "check_availability":
-        return await _fn_check_availability(params, business, db)
-    elif fn_name == "book_appointment":
-        return await _fn_book_appointment(params, business, db)
-    else:
-        return {"result": f"Unknown function: {fn_name}"}
+    # Extract tool calls — try Vapi's current format first, fall back to legacy
+    tool_call_list = body.get("toolCallList", [])
+    if not tool_call_list:
+        # Legacy format fallback
+        fc = body.get("functionCall", body.get("function_call", {}))
+        if fc:
+            tool_call_list = [{"id": "legacy", "name": fc.get("name", ""), "arguments": fc.get("parameters", {})}]
+
+    logger.info("tool-calls: %d calls, business=%s",
+                len(tool_call_list), business.slug if business else "NOT FOUND")
+
+    results = []
+    for tc in tool_call_list:
+        tool_call_id = tc.get("id", "")
+        fn_name = tc.get("name", "")
+        params = tc.get("arguments", {})
+        logger.info("tool-call: id=%s fn=%s params=%s", tool_call_id, fn_name, params)
+
+        if fn_name == "check_availability":
+            result_str = await _fn_check_availability(params, business, db)
+        elif fn_name == "book_appointment":
+            result_str = await _fn_book_appointment(params, business, db)
+        else:
+            result_str = f"Unknown function: {fn_name}"
+
+        results.append({"toolCallId": tool_call_id, "result": result_str})
+
+    return {"results": results}
 
 
 async def _fn_check_availability(
     params: dict, business: Business | None, db: AsyncSession
-) -> dict:
-    """Check available appointment slots."""
+) -> str:
+    """Check available appointment slots. Returns a string result."""
     date_str = params.get("date", "")
     service_name = params.get("service_name")
 
     if not business:
-        return {"result": "I'm sorry, I couldn't identify the business. Please try again."}
+        return "I'm sorry, I couldn't identify the business. Please try again."
 
     try:
         duration = business.appointment_duration_default or 60
@@ -254,26 +279,20 @@ async def _fn_check_availability(
                 s.get("start", str(s)) if isinstance(s, dict) else str(s)
                 for s in slots
             ]
-            return {
-                "result": f"Available times on {date_str}: {', '.join(slot_strings)}"
-            }
+            return f"Available times on {date_str}: {', '.join(slot_strings)}"
         else:
-            return {
-                "result": f"Sorry, there are no available slots on {date_str}. Would you like to try another date?"
-            }
+            return f"Sorry, there are no available slots on {date_str}. Would you like to try another date?"
     except Exception:
         logger.exception("Error checking availability")
-        return {
-            "result": "I had trouble checking availability. Could you please try a different date?"
-        }
+        return "I had trouble checking availability. Could you please try a different date?"
 
 
 async def _fn_book_appointment(
     params: dict, business: Business | None, db: AsyncSession
-) -> dict:
-    """Book an appointment and create lead record."""
+) -> str:
+    """Book an appointment and create lead record. Returns a string result."""
     if not business:
-        return {"result": "I'm sorry, I couldn't identify the business."}
+        return "I'm sorry, I couldn't identify the business."
 
     name = params.get("name", "")
     phone = params.get("phone", "")
@@ -286,7 +305,7 @@ async def _fn_book_appointment(
             f"{date_str} {time_str}", "%Y-%m-%d %H:%M"
         ).replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
-        return {"result": "I couldn't parse that date and time. Please provide date as YYYY-MM-DD and time as HH:MM."}
+        return "I couldn't parse that date and time. Please provide date as YYYY-MM-DD and time as HH:MM."
 
     # Create or find lead
     lead_result = await db.execute(
@@ -353,10 +372,10 @@ async def _fn_book_appointment(
     except Exception:
         logger.warning("Failed to send booking notification for appointment %s", appointment.id)
 
-    return {
-        "result": f"Great! I've booked your appointment for {date_str} at {time_str}. "
+    return (
+        f"Great! I've booked your appointment for {date_str} at {time_str}. "
         f"We look forward to seeing you, {name}!"
-    }
+    )
 
 
 async def _handle_end_of_call_report(body: dict, db: AsyncSession) -> dict:

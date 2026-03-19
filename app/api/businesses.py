@@ -103,7 +103,7 @@ async def google_oauth_callback(
 
     settings = get_settings()
     return RedirectResponse(
-        url=f"{settings.BASE_URL}/admin/businesses/{business_id}?oauth=success"
+        url=f"{settings.BASE_URL}/admin/businesses/{business_id}/edit?oauth=success"
     )
 
 

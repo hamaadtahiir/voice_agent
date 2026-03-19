@@ -131,8 +131,10 @@ async def handle_oauth_callback(code: str, business_id: str, db) -> None:
     }
     encrypted_token = encrypt_value(json.dumps(token_data))
 
+    import uuid as _uuid
+    bid = _uuid.UUID(business_id) if isinstance(business_id, str) else business_id
     result = await db.execute(
-        select(Business).where(Business.id == business_id)
+        select(Business).where(Business.id == bid)
     )
     business = result.scalar_one_or_none()
     if business:
