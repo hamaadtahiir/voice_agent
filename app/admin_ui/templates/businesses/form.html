@@ -479,7 +479,9 @@
         welcome_message: document.getElementById('brand-welcome').value.trim() || null
       },
       slack_webhook_url: document.getElementById('int-slack').value.trim() || null,
-      notification_emails: document.getElementById('int-emails').value.trim() || null,
+      notification_emails: document.getElementById('int-emails').value.trim()
+        ? document.getElementById('int-emails').value.trim().split(',').map(function(e) { return e.trim(); }).filter(Boolean)
+        : null,
       notification_phone: document.getElementById('int-phone').value.trim() || null,
       whatsapp_phone_number_id: document.getElementById('int-wa-phone').value.trim() || null,
       vapi_assistant_id: document.getElementById('int-vapi-assistant').value.trim() || null,
