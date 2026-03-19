@@ -71,15 +71,9 @@ async def create_business(
         website=body.website,
         timezone=body.timezone,
         service_areas=body.service_areas,
-        business_hours=(
-            [h.model_dump() for h in body.business_hours]
-            if body.business_hours
-            else None
-        ),
-        services=(
-            [s.model_dump() for s in body.services] if body.services else None
-        ),
-        branding=body.branding.model_dump() if body.branding else None,
+        business_hours=body.business_hours,
+        services=body.services,
+        branding=body.branding,
         appointment_duration_default=body.appointment_duration_default,
         is_active=True,
     )
@@ -154,23 +148,6 @@ async def update_business(
             raise HTTPException(
                 status_code=409, detail="A business with this slug already exists"
             )
-
-    # Convert pydantic models to dicts for JSON fields
-    if "business_hours" in update_data and update_data["business_hours"] is not None:
-        update_data["business_hours"] = [
-            h.model_dump() if hasattr(h, "model_dump") else h
-            for h in update_data["business_hours"]
-        ]
-    if "services" in update_data and update_data["services"] is not None:
-        update_data["services"] = [
-            s.model_dump() if hasattr(s, "model_dump") else s
-            for s in update_data["services"]
-        ]
-    if "branding" in update_data and update_data["branding"] is not None:
-        branding = update_data["branding"]
-        update_data["branding"] = (
-            branding.model_dump() if hasattr(branding, "model_dump") else branding
-        )
 
     for field, value in update_data.items():
         setattr(business, field, value)

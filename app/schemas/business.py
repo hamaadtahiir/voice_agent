@@ -35,9 +35,9 @@ class BusinessCreate(BaseModel):
     website: Optional[str] = None
     timezone: str = "America/New_York"
     service_areas: Optional[list] = None
-    business_hours: Optional[list[BusinessHours]] = None
-    services: Optional[list[ServiceConfig]] = None
-    branding: Optional[BrandingConfig] = None
+    business_hours: Optional[dict] = None
+    services: Optional[list] = None
+    branding: Optional[dict] = None
     appointment_duration_default: int = 60
     vapi_assistant_id: Optional[str] = None
     vapi_phone_number_id: Optional[str] = None
@@ -52,9 +52,9 @@ class BusinessUpdate(BaseModel):
     website: Optional[str] = None
     timezone: Optional[str] = None
     service_areas: Optional[list] = None
-    business_hours: Optional[list[BusinessHours]] = None
-    services: Optional[list[ServiceConfig]] = None
-    branding: Optional[BrandingConfig] = None
+    business_hours: Optional[dict] = None
+    services: Optional[list] = None
+    branding: Optional[dict] = None
     appointment_duration_default: Optional[int] = None
     system_prompt_override: Optional[str] = None
     qualification_questions: Optional[list] = None
