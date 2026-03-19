@@ -38,7 +38,8 @@ async def vapi_webhook(
     # Vapi wraps all webhook payloads inside a "message" object
     message = body.get("message", body)
     payload_type = message.get("type", "")
-    logger.info("Vapi webhook: type=%s", payload_type)
+    logger.info("Vapi webhook: type=%s, body_keys=%s, message_keys=%s",
+                payload_type, list(body.keys()), list(message.keys()))
 
     if payload_type == "assistant-request":
         return await _handle_assistant_request(message, db)
