@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class ServiceConfig(BaseModel):
@@ -83,6 +83,7 @@ class BusinessResponse(BaseModel):
     services: Optional[list] = None
     branding: Optional[dict] = None
     google_calendar_id: Optional[str] = None
+    google_calendar_connected: bool = False
     slack_webhook_url: Optional[str] = None
     notification_emails: Optional[list] = None
     notification_phone: Optional[str] = None
@@ -95,3 +96,18 @@ class BusinessResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def _set_calendar_connected(cls, data):
+        """Set google_calendar_connected based on whether oauth token exists."""
+        if hasattr(data, "__dict__"):
+            # ORM model
+            if getattr(data, "google_oauth_token", None):
+                d = {k: getattr(data, k) for k in cls.model_fields if hasattr(data, k)}
+                d["google_calendar_connected"] = True
+                return d
+        elif isinstance(data, dict):
+            if data.get("google_oauth_token"):
+                data["google_calendar_connected"] = True
+        return data

@@ -26,6 +26,9 @@ router = APIRouter()
 
 def _build_assistant_config(business: Business | None) -> dict:
     """Build the Vapi assistant configuration for a business."""
+    settings = get_settings()
+    server_url = f"{settings.BASE_URL}/webhooks/vapi" if settings.BASE_URL else None
+
     system_prompt = (
         "You are a friendly and professional AI assistant for a business. "
         "Your job is to qualify leads and help them book appointments. "
@@ -37,6 +40,10 @@ def _build_assistant_config(business: Business | None) -> dict:
         if business.system_prompt_override:
             system_prompt = business.system_prompt_override
         first_message = f"Hello! Thank you for calling {business.name}. How can I help you today?"
+
+    # Vapi custom tools: each tool needs a server.url so Vapi sends
+    # tool-calls to our webhook instead of trying to handle them internally.
+    server_block = {"url": server_url} if server_url else {}
 
     tools = [
         {
@@ -59,6 +66,7 @@ def _build_assistant_config(business: Business | None) -> dict:
                     "required": ["date"],
                 },
             },
+            "server": server_block,
         },
         {
             "type": "function",
@@ -92,6 +100,7 @@ def _build_assistant_config(business: Business | None) -> dict:
                     "required": ["date", "time", "name"],
                 },
             },
+            "server": server_block,
         },
     ]
 
@@ -100,7 +109,6 @@ def _build_assistant_config(business: Business | None) -> dict:
             "provider": "openai",
             "model": "gpt-4o-mini",
             "messages": [{"role": "system", "content": system_prompt}],
-            "tools": tools,
         },
         "voice": {
             "provider": "11labs",
@@ -109,6 +117,8 @@ def _build_assistant_config(business: Business | None) -> dict:
         "firstMessage": first_message,
         "silenceTimeoutSeconds": 30,
         "maxDurationSeconds": 600,
+        "serverUrl": server_url,
+        "tools": tools,
     }
 
 

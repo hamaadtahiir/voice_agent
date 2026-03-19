@@ -226,11 +226,28 @@
               </svg>
               Google Calendar
             </h4>
-            <button type="button" id="gcal-connect-btn" onclick="connectGoogleCalendar()"
-                    class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-sm font-medium rounded-lg transition text-slate-700">
-              Connect Google Calendar
-            </button>
-            <p class="text-xs text-slate-400 mt-2">Allows automatic appointment scheduling to Google Calendar.</p>
+            <div id="gcal-status-disconnected">
+              <button type="button" id="gcal-connect-btn" onclick="connectGoogleCalendar()"
+                      class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-sm font-medium rounded-lg transition text-slate-700">
+                Connect Google Calendar
+              </button>
+              <p class="text-xs text-slate-400 mt-2">Allows automatic appointment scheduling to Google Calendar.</p>
+            </div>
+            <div id="gcal-status-connected" class="hidden">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-sm font-medium rounded-full border border-green-200">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Connected
+                </span>
+                <span id="gcal-calendar-id" class="text-xs text-slate-500"></span>
+              </div>
+              <button type="button" onclick="connectGoogleCalendar()"
+                      class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-xs font-medium rounded-lg transition text-slate-600">
+                Reconnect
+              </button>
+            </div>
           </div>
 
           {# Slack #}
@@ -586,6 +603,13 @@
       document.getElementById('int-vapi-assistant').value = b.vapi_assistant_id || '';
       document.getElementById('int-vapi-phone').value = b.vapi_phone_number_id || '';
 
+      /* Google Calendar connected state */
+      if (b.google_calendar_connected || b.google_calendar_id) {
+        document.getElementById('gcal-status-disconnected').classList.add('hidden');
+        document.getElementById('gcal-status-connected').classList.remove('hidden');
+        document.getElementById('gcal-calendar-id').textContent = 'Calendar: ' + b.google_calendar_id;
+      }
+
     }).catch(function(err) {
       showToast('Failed to load business details', 'error');
     });
@@ -597,6 +621,15 @@
     d.textContent = str;
     return d.innerHTML;
   }
+
+  /* Show success toast if redirected from OAuth */
+  (function() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('oauth') === 'success') {
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(function() { showToast('Google Calendar connected successfully!', 'success'); }, 500);
+    }
+  })();
 
   document.addEventListener('DOMContentLoaded', loadBusiness);
 </script>
