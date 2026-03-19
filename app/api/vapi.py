@@ -4,10 +4,12 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.session import get_db
 from app.models.business import Business
 from app.models.conversation import Conversation
@@ -22,56 +24,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/webhooks/vapi")
-async def vapi_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Handle Vapi webhook events.
-
-    Payload types:
-    - assistant-request: return assistant configuration
-    - function-call: execute tool calls (check_availability, book_appointment)
-    - end-of-call-report: save lead/conversation record
-    """
-    body: dict = await request.json()
-    # Vapi wraps all webhook payloads inside a "message" object
-    message = body.get("message", body)
-    payload_type = message.get("type", "")
-    logger.info("Vapi webhook: type=%s, body_keys=%s, message_keys=%s",
-                payload_type, list(body.keys()), list(message.keys()))
-
-    if payload_type == "assistant-request":
-        return await _handle_assistant_request(message, db)
-    elif payload_type == "function-call":
-        return await _handle_function_call(message, db)
-    elif payload_type == "end-of-call-report":
-        return await _handle_end_of_call_report(message, db)
-    else:
-        logger.info("Unhandled Vapi payload type: %s", payload_type)
-        return {"status": "ok"}
-
-
-async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
-    """Return assistant configuration for an incoming call."""
-    call_data = body.get("call", {})
-
-    # Try to find the business by vapi_phone_number_id
-    phone_number_id = call_data.get("phoneNumberId")
-    logger.info("assistant-request: phoneNumberId=%s", phone_number_id)
-    business = None
-    if phone_number_id:
-        result = await db.execute(
-            select(Business).where(
-                Business.vapi_phone_number_id == phone_number_id,
-                Business.is_active == True,  # noqa: E712
-            )
-        )
-        business = result.scalar_one_or_none()
-
-    logger.info("assistant-request: business=%s", business.slug if business else "NOT FOUND")
-
-    # Build assistant config
+def _build_assistant_config(business: Business | None) -> dict:
+    """Build the Vapi assistant configuration for a business."""
     system_prompt = (
         "You are a friendly and professional AI assistant for a business. "
         "Your job is to qualify leads and help them book appointments. "
@@ -142,24 +96,112 @@ async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
     ]
 
     return {
-        "assistant": {
-            "model": {
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": system_prompt}
-                ],
-                "tools": tools,
-            },
-            "voice": {
-                "provider": "11labs",
-                "voiceId": "21m00Tcm4TlvDq8ikWAM",
-            },
-            "firstMessage": first_message,
-            "silenceTimeoutSeconds": 30,
-            "maxDurationSeconds": 600,
-        }
+        "model": {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "system", "content": system_prompt}],
+            "tools": tools,
+        },
+        "voice": {
+            "provider": "11labs",
+            "voiceId": "21m00Tcm4TlvDq8ikWAM",
+        },
+        "firstMessage": first_message,
+        "silenceTimeoutSeconds": 30,
+        "maxDurationSeconds": 600,
     }
+
+
+async def sync_vapi_assistant(business: Business) -> bool:
+    """Push assistant configuration to Vapi via their API.
+
+    Call this after saving a business that has vapi_assistant_id set.
+    Returns True on success, False on failure.
+    """
+    settings = get_settings()
+    if not settings.VAPI_API_KEY or not business.vapi_assistant_id:
+        logger.info("sync_vapi_assistant: skipped (no API key or assistant ID)")
+        return False
+
+    config = _build_assistant_config(business)
+
+    # Also set the serverUrl so Vapi sends events to our webhook
+    if settings.BASE_URL:
+        config["serverUrl"] = f"{settings.BASE_URL}/webhooks/vapi"
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.patch(
+                f"https://api.vapi.ai/assistant/{business.vapi_assistant_id}",
+                json=config,
+                headers={
+                    "Authorization": f"Bearer {settings.VAPI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+        if resp.status_code == 200:
+            logger.info("Synced Vapi assistant %s for business %s",
+                        business.vapi_assistant_id, business.slug)
+            return True
+        else:
+            logger.warning("Failed to sync Vapi assistant: %s %s",
+                           resp.status_code, resp.text)
+            return False
+    except Exception:
+        logger.exception("Error syncing Vapi assistant for business %s", business.slug)
+        return False
+
+
+@router.post("/webhooks/vapi")
+async def vapi_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle Vapi webhook events.
+
+    Payload types:
+    - assistant-request: return assistant configuration
+    - function-call: execute tool calls (check_availability, book_appointment)
+    - end-of-call-report: save lead/conversation record
+    """
+    body: dict = await request.json()
+    # Vapi wraps all webhook payloads inside a "message" object
+    message = body.get("message", body)
+    payload_type = message.get("type", "")
+    logger.info("Vapi webhook: type=%s, body_keys=%s, message_keys=%s",
+                payload_type, list(body.keys()), list(message.keys()))
+
+    if payload_type == "assistant-request":
+        return await _handle_assistant_request(message, db)
+    elif payload_type == "function-call":
+        return await _handle_function_call(message, db)
+    elif payload_type == "end-of-call-report":
+        return await _handle_end_of_call_report(message, db)
+    else:
+        logger.info("Unhandled Vapi payload type: %s", payload_type)
+        return {"status": "ok"}
+
+
+async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
+    """Return assistant configuration for an incoming call."""
+    call_data = body.get("call", {})
+
+    # Try to find the business by vapi_phone_number_id
+    phone_number_id = call_data.get("phoneNumberId")
+    logger.info("assistant-request: phoneNumberId=%s", phone_number_id)
+    business = None
+    if phone_number_id:
+        result = await db.execute(
+            select(Business).where(
+                Business.vapi_phone_number_id == phone_number_id,
+                Business.is_active == True,  # noqa: E712
+            )
+        )
+        business = result.scalar_one_or_none()
+
+    logger.info("assistant-request: business=%s", business.slug if business else "NOT FOUND")
+
+    return {"assistant": _build_assistant_config(business)}
 
 
 async def _handle_function_call(body: dict, db: AsyncSession) -> dict:

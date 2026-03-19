@@ -154,6 +154,12 @@ async def update_business(
 
     await db.flush()
     await db.refresh(business)
+
+    # Sync assistant config to Vapi if the business has a Vapi assistant
+    if business.vapi_assistant_id:
+        from app.api.vapi import sync_vapi_assistant
+        await sync_vapi_assistant(business)
+
     return BusinessResponse.model_validate(business)
 
 
