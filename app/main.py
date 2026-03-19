@@ -28,6 +28,27 @@ async def lifespan(app: FastAPI):
         logger.info("DEBUG mode: creating database tables")
         await init_db()
 
+        # Auto-seed if database is empty (no admin account exists)
+        from app.db.engine import async_session_factory
+        from sqlalchemy import select
+        from app.models.admin import Admin
+
+        async with async_session_factory() as db:
+            existing = await db.execute(
+                select(Admin).where(Admin.email == "admin@inbound-bot.com")
+            )
+            if not existing.scalar_one_or_none():
+                logger.info("Empty database detected — running auto-seed")
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    "seed_dev_data",
+                    os.path.join(os.path.dirname(__file__), "..", "scripts", "seed_dev_data.py"),
+                )
+                seed_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(seed_module)
+                await seed_module.seed()
+                logger.info("Auto-seed complete")
+
     # Start the APScheduler background scheduler (reminders, re-engagement, etc.)
     start_scheduler()
     logger.info("Background scheduler started")
