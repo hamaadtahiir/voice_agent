@@ -200,4 +200,4 @@ async def initiate_google_oauth(
             detail=f"Failed to initiate OAuth: {str(exc)}",
         )
 
-    return RedirectResponse(url=auth_url)
+    return {"url": auth_url}

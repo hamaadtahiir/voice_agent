@@ -448,7 +448,25 @@
 
   /* ---- Google Calendar ---- */
   function connectGoogleCalendar() {
-    showToast('Google Calendar OAuth flow would open here', 'info');
+    if (!businessId) {
+      showToast('Save the business first before connecting Google Calendar', 'warning');
+      return;
+    }
+    authFetch('/api/businesses/' + businessId + '/oauth/google')
+      .then(function(res) {
+        if (!res.ok) throw new Error('Failed');
+        return res.json();
+      })
+      .then(function(data) {
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          showToast('No OAuth URL returned', 'error');
+        }
+      })
+      .catch(function() {
+        showToast('Failed to start Google Calendar connection. Check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set.', 'error');
+      });
   }
 
   /* ---- Save Business ---- */
