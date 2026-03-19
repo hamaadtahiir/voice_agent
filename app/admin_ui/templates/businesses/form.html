@@ -295,6 +295,12 @@
                        class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
                        placeholder="asst_xxxxxxx">
               </div>
+              <div>
+                <label class="block text-sm text-slate-600 mb-1.5">Vapi Phone Number ID</label>
+                <input type="text" name="vapi_phone_number_id" id="int-vapi-phone"
+                       class="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+                       placeholder="phone_number_xxxxxxx">
+              </div>
             </div>
           </div>
         </div>
@@ -472,15 +478,12 @@
         logo_url: document.getElementById('brand-logo').value.trim() || null,
         welcome_message: document.getElementById('brand-welcome').value.trim() || null
       },
-      integrations: {
-        slack_webhook_url: document.getElementById('int-slack').value.trim() || null,
-        notification_emails: document.getElementById('int-emails').value.trim() || null,
-        notification_phone: document.getElementById('int-phone').value.trim() || null,
-        whatsapp_phone_id: document.getElementById('int-wa-phone').value.trim() || null,
-        whatsapp_token: document.getElementById('int-wa-token').value.trim() || null,
-        vapi_api_key: document.getElementById('int-vapi-key').value.trim() || null,
-        vapi_assistant_id: document.getElementById('int-vapi-assistant').value.trim() || null
-      }
+      slack_webhook_url: document.getElementById('int-slack').value.trim() || null,
+      notification_emails: document.getElementById('int-emails').value.trim() || null,
+      notification_phone: document.getElementById('int-phone').value.trim() || null,
+      whatsapp_phone_number_id: document.getElementById('int-wa-phone').value.trim() || null,
+      vapi_assistant_id: document.getElementById('int-vapi-assistant').value.trim() || null,
+      vapi_phone_number_id: document.getElementById('int-vapi-phone').value.trim() || null
     };
 
     var url = businessId ? '/api/businesses/' + businessId : '/api/businesses';
@@ -556,14 +559,12 @@
       document.getElementById('brand-welcome').value = branding.welcome_message || '';
 
       /* Integrations */
-      var integ = b.integrations || {};
-      document.getElementById('int-slack').value = integ.slack_webhook_url || '';
-      document.getElementById('int-emails').value = integ.notification_emails || '';
-      document.getElementById('int-phone').value = integ.notification_phone || '';
-      document.getElementById('int-wa-phone').value = integ.whatsapp_phone_id || '';
-      document.getElementById('int-wa-token').value = integ.whatsapp_token || '';
-      document.getElementById('int-vapi-key').value = integ.vapi_api_key || '';
-      document.getElementById('int-vapi-assistant').value = integ.vapi_assistant_id || '';
+      document.getElementById('int-slack').value = b.slack_webhook_url || '';
+      document.getElementById('int-emails').value = (b.notification_emails || []).join(', ');
+      document.getElementById('int-phone').value = b.notification_phone || '';
+      document.getElementById('int-wa-phone').value = b.whatsapp_phone_number_id || '';
+      document.getElementById('int-vapi-assistant').value = b.vapi_assistant_id || '';
+      document.getElementById('int-vapi-phone').value = b.vapi_phone_number_id || '';
 
     }).catch(function(err) {
       showToast('Failed to load business details', 'error');

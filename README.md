@@ -289,7 +289,8 @@ Open in browser:
 2. Set **Server URL** to: `https://YOUR_APP_URL/webhooks/vapi`
 3. Under **Server Events**, enable: `assistant-request`, `function-call`, `end-of-call-report`
 4. Under **Advanced**: leave **First message** empty (our server provides it dynamically), set **Max duration** to 600 seconds
-5. Save -- note the **Assistant ID**
+5. **IMPORTANT**: Leave the **System Prompt** field empty in the Vapi dashboard -- the server provides it dynamically based on the business configuration. If you paste a prompt here, it will override the server's dynamic prompt.
+6. Save -- note the **Assistant ID**
 
 **Connect phone number to assistant:**
 
@@ -441,6 +442,7 @@ Creates admin (`admin@inbound-bot.com` / `admin123`) and two sample businesses.
    - **Server URL**: `https://YOUR_APP_URL/webhooks/vapi`
    - Enable events: `assistant-request`, `function-call`, `end-of-call-report`
    - Leave **First message** empty, set **Max duration** = 600s
+   - **IMPORTANT**: Leave the **System Prompt** field empty -- the server provides it dynamically based on the business
    - Save, note the **Assistant ID**
 4. **Phone Numbers** > your number > set **Inbound Assistant** > save
 5. Link to business:
@@ -551,6 +553,7 @@ fly open  # opens https://your-app.fly.dev in browser
    - **Server URL**: `https://YOUR_APP_URL/webhooks/vapi`
    - Enable events: `assistant-request`, `function-call`, `end-of-call-report`
    - Leave **First message** empty, set **Max duration** = 600s
+   - **IMPORTANT**: Leave the **System Prompt** field empty -- the server provides it dynamically based on the business
    - Save, note the **Assistant ID**
 4. **Phone Numbers** > your number > set **Inbound Assistant** > save
 5. Link to business:
@@ -750,7 +753,7 @@ Vapi handles the voice conversation (speech-to-text, LLM, text-to-speech). Our s
 
 1. Sign up at [vapi.ai](https://vapi.ai/) and get your API key
 2. Buy a phone number in the Vapi dashboard (or port an existing one)
-3. Create an assistant -- set **Server URL** to `https://your-app-url/webhooks/vapi`
+3. Create an assistant -- set **Server URL** to `https://your-app-url/webhooks/vapi`. **Leave the System Prompt field empty** -- the server provides it dynamically based on the business.
 4. Set `VAPI_API_KEY` in your environment
 5. In the admin panel, edit the business and set `vapi_assistant_id` and `vapi_phone_number_id` to match what's in Vapi
 6. Call the phone number -- the AI answers, qualifies the caller, and can book appointments

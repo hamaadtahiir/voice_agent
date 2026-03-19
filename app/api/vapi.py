@@ -36,6 +36,7 @@ async def vapi_webhook(
     """
     body: dict = await request.json()
     payload_type = body.get("type", "")
+    logger.info("Vapi webhook: type=%s", payload_type)
 
     if payload_type == "assistant-request":
         return await _handle_assistant_request(body, db)
@@ -54,6 +55,7 @@ async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
 
     # Try to find the business by vapi_phone_number_id
     phone_number_id = call_data.get("phoneNumberId")
+    logger.info("assistant-request: phoneNumberId=%s", phone_number_id)
     business = None
     if phone_number_id:
         result = await db.execute(
@@ -63,6 +65,8 @@ async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
             )
         )
         business = result.scalar_one_or_none()
+
+    logger.info("assistant-request: business=%s", business.slug if business else "NOT FOUND")
 
     # Build assistant config
     system_prompt = (
@@ -139,7 +143,9 @@ async def _handle_assistant_request(body: dict, db: AsyncSession) -> dict:
             "model": {
                 "provider": "openai",
                 "model": "gpt-4o-mini",
-                "systemPrompt": system_prompt,
+                "messages": [
+                    {"role": "system", "content": system_prompt}
+                ],
                 "tools": tools,
             },
             "voice": {

@@ -39,6 +39,8 @@ class BusinessCreate(BaseModel):
     services: Optional[list[ServiceConfig]] = None
     branding: Optional[BrandingConfig] = None
     appointment_duration_default: int = 60
+    vapi_assistant_id: Optional[str] = None
+    vapi_phone_number_id: Optional[str] = None
 
 
 class BusinessUpdate(BaseModel):
@@ -57,6 +59,12 @@ class BusinessUpdate(BaseModel):
     system_prompt_override: Optional[str] = None
     qualification_questions: Optional[list] = None
     is_active: Optional[bool] = None
+    vapi_assistant_id: Optional[str] = None
+    vapi_phone_number_id: Optional[str] = None
+    slack_webhook_url: Optional[str] = None
+    notification_emails: Optional[list] = None
+    notification_phone: Optional[str] = None
+    whatsapp_phone_number_id: Optional[str] = None
 
 
 class BusinessResponse(BaseModel):
