@@ -35,15 +35,17 @@ async def vapi_webhook(
     - end-of-call-report: save lead/conversation record
     """
     body: dict = await request.json()
-    payload_type = body.get("type", "")
+    # Vapi wraps all webhook payloads inside a "message" object
+    message = body.get("message", body)
+    payload_type = message.get("type", "")
     logger.info("Vapi webhook: type=%s", payload_type)
 
     if payload_type == "assistant-request":
-        return await _handle_assistant_request(body, db)
+        return await _handle_assistant_request(message, db)
     elif payload_type == "function-call":
-        return await _handle_function_call(body, db)
+        return await _handle_function_call(message, db)
     elif payload_type == "end-of-call-report":
-        return await _handle_end_of_call_report(body, db)
+        return await _handle_end_of_call_report(message, db)
     else:
         logger.info("Unhandled Vapi payload type: %s", payload_type)
         return {"status": "ok"}
@@ -317,17 +319,16 @@ async def _fn_book_appointment(
 async def _handle_end_of_call_report(body: dict, db: AsyncSession) -> dict:
     """Process end-of-call report: create/update lead and conversation records."""
     call_data = body.get("call", {})
-    message_data = body.get("message", body)
 
     phone_number_id = call_data.get("phoneNumberId")
     caller_number = call_data.get("customer", {}).get("number", "")
     call_id = call_data.get("id", str(uuid.uuid4()))
 
     # Transcript and summary
-    transcript = message_data.get("transcript", "")
-    summary = message_data.get("summary", "")
-    ended_reason = message_data.get("endedReason", "")
-    duration_seconds = message_data.get("duration") or call_data.get("duration")
+    transcript = body.get("transcript", "")
+    summary = body.get("summary", "")
+    ended_reason = body.get("endedReason", "")
+    duration_seconds = body.get("duration") or call_data.get("duration")
 
     # Look up business
     business = None
