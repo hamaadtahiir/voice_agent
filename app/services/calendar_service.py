@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+# Temporary storage for PKCE code verifiers, keyed by business_id (state param).
+# Cleared after use in the callback.
+_pkce_verifiers: dict[str, str] = {}
+
 
 def _get_client_config() -> dict:
     """Return the Google OAuth client config dict."""
@@ -94,6 +98,9 @@ def initiate_oauth(business_id: str) -> str:
         prompt="consent",
         state=business_id,
     )
+    # Store the PKCE code_verifier so the callback can use it
+    if flow.code_verifier:
+        _pkce_verifiers[business_id] = flow.code_verifier
     return auth_url
 
 
@@ -110,6 +117,10 @@ async def handle_oauth_callback(code: str, business_id: str, db) -> None:
         scopes=SCOPES,
         redirect_uri=settings.GOOGLE_REDIRECT_URI,
     )
+    # Restore the PKCE code_verifier from the initiate step
+    stored_verifier = _pkce_verifiers.pop(business_id, None)
+    if stored_verifier:
+        flow.code_verifier = stored_verifier
     flow.fetch_token(code=code)
     creds = flow.credentials
 
