@@ -1,5 +1,6 @@
 """Vapi voice AI webhook routes."""
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -239,11 +240,24 @@ async def _handle_tool_calls(body: dict, db: AsyncSession) -> dict:
 
     # Extract tool calls — try Vapi's current format first, fall back to legacy
     tool_call_list = body.get("toolCallList", [])
+
+    # Fallback: toolWithToolCallList (alternative Vapi format where each item
+    # contains both the tool definition and the call)
+    if not tool_call_list:
+        twtcl = body.get("toolWithToolCallList", [])
+        for item in twtcl:
+            tc = item.get("toolCall", {})
+            function_obj = tc.get("function", {})
+            tool_call_list.append({
+                "id": tc.get("id", ""),
+                "function": function_obj,
+            })
+
     if not tool_call_list:
         # Legacy format fallback
         fc = body.get("functionCall", body.get("function_call", {}))
         if fc:
-            tool_call_list = [{"id": "legacy", "name": fc.get("name", ""), "arguments": fc.get("parameters", {})}]
+            tool_call_list = [{"id": "legacy", "function": {"name": fc.get("name", ""), "arguments": fc.get("parameters", {})}}]
 
     logger.info("tool-calls: %d calls, business=%s",
                 len(tool_call_list), business.slug if business else "NOT FOUND")
@@ -251,8 +265,18 @@ async def _handle_tool_calls(body: dict, db: AsyncSession) -> dict:
     results = []
     for tc in tool_call_list:
         tool_call_id = tc.get("id", "")
-        fn_name = tc.get("name", "")
-        params = tc.get("arguments", {})
+        # Vapi nests name/arguments inside a "function" object (OpenAI format)
+        function_obj = tc.get("function", {})
+        fn_name = function_obj.get("name", "") or tc.get("name", "")
+        raw_args = function_obj.get("arguments", "{}") or tc.get("arguments", "{}")
+        # arguments can be a JSON string or already a dict
+        if isinstance(raw_args, str):
+            try:
+                params = json.loads(raw_args)
+            except (json.JSONDecodeError, TypeError):
+                params = {}
+        else:
+            params = raw_args or {}
         logger.info("tool-call: id=%s fn=%s params=%s", tool_call_id, fn_name, params)
 
         if fn_name == "check_availability":
