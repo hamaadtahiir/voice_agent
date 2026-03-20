@@ -109,6 +109,7 @@ def _build_assistant_config(business: Business | None) -> dict:
             "provider": "openai",
             "model": "gpt-4o-mini",
             "messages": [{"role": "system", "content": system_prompt}],
+            "tools": tools,
         },
         "voice": {
             "provider": "11labs",
@@ -118,7 +119,6 @@ def _build_assistant_config(business: Business | None) -> dict:
         "silenceTimeoutSeconds": 30,
         "maxDurationSeconds": 600,
         "serverUrl": server_url,
-        "tools": tools,
     }
 
 
