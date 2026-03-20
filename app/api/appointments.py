@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
@@ -35,7 +36,7 @@ async def list_appointments(
     per_page: int = Query(25, ge=1, le=100),
 ):
     """List appointments with filters and pagination."""
-    query = select(Appointment).order_by(Appointment.scheduled_at.desc())
+    query = select(Appointment).options(selectinload(Appointment.lead)).order_by(Appointment.scheduled_at.desc())
     count_query = select(func.count(Appointment.id))
 
     if business_id:
@@ -60,8 +61,15 @@ async def list_appointments(
     result = await db.execute(query)
     appointments = result.scalars().all()
 
+    items = []
+    for a in appointments:
+        data = AppointmentResponse.model_validate(a)
+        if a.lead:
+            data.lead_name = a.lead.name
+        items.append(data)
+
     return {
-        "items": [AppointmentResponse.model_validate(a) for a in appointments],
+        "items": items,
         "total": total,
         "page": page,
         "per_page": per_page,

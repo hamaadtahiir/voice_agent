@@ -282,7 +282,7 @@ async def _handle_tool_calls(body: dict, db: AsyncSession) -> dict:
         if fn_name == "check_availability":
             result_str = await _fn_check_availability(params, business, db)
         elif fn_name == "book_appointment":
-            result_str = await _fn_book_appointment(params, business, db)
+            result_str = await _fn_book_appointment(params, business, db, call_data)
         else:
             result_str = f"Unknown function: {fn_name}"
 
@@ -322,7 +322,8 @@ async def _fn_check_availability(
 
 
 async def _fn_book_appointment(
-    params: dict, business: Business | None, db: AsyncSession
+    params: dict, business: Business | None, db: AsyncSession,
+    call_data: dict | None = None,
 ) -> str:
     """Book an appointment and create lead record. Returns a string result."""
     if not business:
@@ -334,6 +335,11 @@ async def _fn_book_appointment(
     time_str = params.get("time", "")
     service_name = params.get("service_name")
 
+    call_data = call_data or {}
+    call_id = call_data.get("id", "")
+    # Prefer the real caller ID from Vapi over verbally-provided phone
+    caller_phone = call_data.get("customer", {}).get("number", "") or phone
+
     try:
         scheduled_at = datetime.strptime(
             f"{date_str} {time_str}", "%Y-%m-%d %H:%M"
@@ -341,27 +347,48 @@ async def _fn_book_appointment(
     except (ValueError, TypeError):
         return "I couldn't parse that date and time. Please provide date as YYYY-MM-DD and time as HH:MM."
 
-    # Create or find lead
-    lead_result = await db.execute(
-        select(Lead).where(
-            Lead.business_id == business.id,
-            Lead.phone == phone,
-            Lead.channel == "phone",
+    # Create or find lead — try by call_id first, then by real caller phone
+    lead = None
+    if call_id:
+        lead_result = await db.execute(
+            select(Lead).where(
+                Lead.business_id == business.id,
+                Lead.external_id == call_id,
+                Lead.channel == "phone",
+            )
         )
-    )
-    lead = lead_result.scalar_one_or_none()
+        lead = lead_result.scalar_one_or_none()
+
+    if not lead and caller_phone:
+        lead_result = await db.execute(
+            select(Lead).where(
+                Lead.business_id == business.id,
+                Lead.phone == caller_phone,
+                Lead.channel == "phone",
+            )
+        )
+        lead = lead_result.scalar_one_or_none()
+
     if not lead:
         lead = Lead(
             id=uuid.uuid4(),
             business_id=business.id,
             channel="phone",
             name=name,
-            phone=phone,
+            phone=caller_phone,
             status="qualified",
             identified_service=service_name,
+            external_id=call_id or None,
         )
         db.add(lead)
         await db.flush()
+    else:
+        # Update existing lead with new info
+        if name:
+            lead.name = name
+        lead.status = "qualified"
+        if service_name:
+            lead.identified_service = service_name
 
     # Create appointment
     from app.models.appointment import Appointment
@@ -441,9 +468,19 @@ async def _handle_end_of_call_report(body: dict, db: AsyncSession) -> dict:
         logger.warning("No business found for Vapi phone_number_id=%s", phone_number_id)
         return {"status": "ok"}
 
-    # Find or create lead
+    # Find or create lead — try by call_id (external_id) first, then by phone
     lead = None
-    if caller_number:
+    if call_id:
+        lead_result = await db.execute(
+            select(Lead).where(
+                Lead.business_id == business.id,
+                Lead.external_id == call_id,
+                Lead.channel == "phone",
+            )
+        )
+        lead = lead_result.scalar_one_or_none()
+
+    if not lead and caller_number:
         lead_result = await db.execute(
             select(Lead).where(
                 Lead.business_id == business.id,
@@ -465,6 +502,12 @@ async def _handle_end_of_call_report(body: dict, db: AsyncSession) -> dict:
         )
         db.add(lead)
         await db.flush()
+    else:
+        # Merge in any missing fields from this call
+        if caller_number and not lead.phone:
+            lead.phone = caller_number
+        if not lead.external_id:
+            lead.external_id = call_id
 
     # Score the lead using the rule-based scorer
     try:

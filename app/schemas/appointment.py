@@ -35,6 +35,7 @@ class AppointmentResponse(BaseModel):
     cancellation_reason: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
+    lead_name: Optional[str] = None
 
 
 class AppointmentUpdate(BaseModel):

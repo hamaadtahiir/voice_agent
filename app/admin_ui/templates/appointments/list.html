@@ -145,7 +145,7 @@
 
         tbody.innerHTML = appts.map(function(a) {
           var statusBadge = 'badge badge-' + (a.status || 'scheduled');
-          var dateStr = formatDateTime(a.scheduled_start || a.start_time || a.date);
+          var dateStr = formatDateTime(a.scheduled_at);
           var duration = a.duration_minutes || a.duration || '--';
           var leadName = a.lead_name || (a.lead && a.lead.name) || 'N/A';
           var service = a.service_name || a.service || 'N/A';
