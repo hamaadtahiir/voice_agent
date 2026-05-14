@@ -42,42 +42,44 @@ AI-powered inbound lead qualification and scheduling system for high-value servi
 
 ### 1. System Architecture
 
-Inbound messages from three text channels are normalized by the Channel Router and fed into the LangGraph conversation engine. Phone calls (Vapi) use a parallel flow where Vapi's own voice AI drives the conversation and our server only handles tool calls and the end-of-call report.
+All four inbound channels feed into the system. Text channels (Web Chat, WhatsApp, Email) are normalized by the Channel Router and run through the LangGraph conversation engine. Phone calls (Vapi) use a separate path — Vapi's own voice AI drives the conversation while our server handles tool calls and saves the result.
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                            INBOUND CHANNELS                                │
-│                                                                            │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐           │
-│  │    Web Chat     │  │    WhatsApp     │  │      Email      │           │
-│  │   (WebSocket)   │  │  (Meta Cloud    │  │  (Resend /      │           │
-│  │  /ws/chat/{slug}│  │   API webhook)  │  │   webhook)      │           │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘           │
-└───────────┼────────────────────┼────────────────────┼────────────────────┘
-            └────────────────────┴────────────────────┘
-                                 │
-                                 ▼
-              ┌──────────────────────────────┐    ┌──────────────────────────────┐
-              │        CHANNEL ROUTER        │    │     Phone / Vapi.ai          │
-              │  ① Find or create Lead       │    │  Voice AI (GPT-4 + 11labs)   │
-              │  ② Find or create Convo      │    │                              │
-              │  ③ Save inbound message      │    │  ① assistant-request         │
-              │  ④ Restore/init graph state  │    │       → return AI config     │
-              └──────────────┬───────────────┘    │  ② function-call             │
-                             │                    │       → check_availability   │
-                             ▼                    │       → book_appointment     │
-              ┌──────────────────────────────┐    │  ③ end-of-call-report        │
-              │   LANGGRAPH CONVERSATION     │    │       → save lead +          │
-              │         ENGINE               │    │         transcript + score   │
-              │      (app/graph/)            │    └──────────────┬───────────────┘
-              └──────────────┬───────────────┘                   │
-                             │                                   │
-                             └──────────────┬────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                INBOUND CHANNELS                                  │
+│                                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
+│  │   Web Chat   │  │  WhatsApp    │  │    Email     │  │  Phone (Vapi.ai)     │ │
+│  │ (WebSocket)  │  │ (Meta Cloud  │  │ (Resend /    │  │  Voice AI (GPT-4 +   │ │
+│  │ /ws/chat/    │  │  API webhook)│  │  webhook)    │  │  11labs ElevenLabs)  │ │
+│  │  {slug}      │  │              │  │              │  │  /webhooks/vapi      │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘ │
+└─────────┼────────────────┼────────────────┼───────────────────────┼─────────────┘
+          │                │                │                        │
+          └────────────────┴────────────────┘              ┌─────────┴──────────┐
+                           │                               │ ① assistant-request│
+                           ▼                               │      → AI config   │
+           ┌───────────────────────────────┐               │ ② function-call    │
+           │         CHANNEL ROUTER        │               │      → check_avail │
+           │  ① Find or create Lead        │               │      → book_appt   │
+           │  ② Find or create Convo       │               │ ③ end-of-call-report│
+           │  ③ Save inbound message       │               │      → save lead + │
+           │  ④ Restore/init graph state   │               │        transcript  │
+           └───────────────┬───────────────┘               └─────────┬──────────┘
+                           │                                         │
+                           ▼                                         │
+           ┌───────────────────────────────┐                         │
+           │   LANGGRAPH CONVERSATION      │                         │
+           │         ENGINE                │                         │
+           │      (app/graph/)             │                         │
+           └───────────────┬───────────────┘                         │
+                           │                                         │
+                           └────────────────┬────────────────────────┘
                                             ▼
-              ┌────────────────────────────────────────────────────────┐
-              │                      DATABASE                           │
-              │   Lead │ Conversation │ Message │ Appointment           │
-              └────────────────────────────────────────────────────────┘
+           ┌────────────────────────────────────────────────────────────┐
+           │                        DATABASE                             │
+           │     Lead │ Conversation │ Message │ Appointment             │
+           └────────────────────────────────────────────────────────────┘
 ```
 
 ---
