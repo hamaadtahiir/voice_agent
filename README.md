@@ -38,6 +38,254 @@ AI-powered inbound lead qualification and scheduling system for high-value servi
 
 ---
 
+## Architecture & State Machine Diagrams
+
+### 1. System Architecture
+
+Inbound messages from three text channels are normalized by the Channel Router and fed into the LangGraph conversation engine. Phone calls (Vapi) use a parallel flow where Vapi's own voice AI drives the conversation and our server only handles tool calls and the end-of-call report.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                            INBOUND CHANNELS                                │
+│                                                                            │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐           │
+│  │    Web Chat     │  │    WhatsApp     │  │      Email      │           │
+│  │   (WebSocket)   │  │  (Meta Cloud    │  │  (Resend /      │           │
+│  │  /ws/chat/{slug}│  │   API webhook)  │  │   webhook)      │           │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘           │
+└───────────┼────────────────────┼────────────────────┼────────────────────┘
+            └────────────────────┴────────────────────┘
+                                 │
+                                 ▼
+              ┌──────────────────────────────┐    ┌──────────────────────────────┐
+              │        CHANNEL ROUTER        │    │     Phone / Vapi.ai          │
+              │  ① Find or create Lead       │    │  Voice AI (GPT-4 + 11labs)   │
+              │  ② Find or create Convo      │    │                              │
+              │  ③ Save inbound message      │    │  ① assistant-request         │
+              │  ④ Restore/init graph state  │    │       → return AI config     │
+              └──────────────┬───────────────┘    │  ② function-call             │
+                             │                    │       → check_availability   │
+                             ▼                    │       → book_appointment     │
+              ┌──────────────────────────────┐    │  ③ end-of-call-report        │
+              │   LANGGRAPH CONVERSATION     │    │       → save lead +          │
+              │         ENGINE               │    │         transcript + score   │
+              │      (app/graph/)            │    └──────────────┬───────────────┘
+              └──────────────┬───────────────┘                   │
+                             │                                   │
+                             └──────────────┬────────────────────┘
+                                            ▼
+              ┌────────────────────────────────────────────────────────┐
+              │                      DATABASE                           │
+              │   Lead │ Conversation │ Message │ Appointment           │
+              └────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 2. Conversation State Machine (LangGraph)
+
+The LangGraph engine runs a 16-node state machine. Every node calls the LLM with a stage-specific system prompt and optional tools. The conversation state (`ConversationState`) is persisted to the database after each turn so multi-turn conversations survive across messages.
+
+```
+                  ┌──────────────────────────────────────────┐
+           ●─────►│                GREETING                  │
+                  │  Return business welcome message          │
+                  └───────────────────┬──────────────────────┘
+                                      │
+                  ┌───────────────────▼──────────────────────┐
+                  │              ASK LOCATION                 │
+                  │  "Could you share your zip code or city?" │
+                  │  Tool: save_lead_info (zip/city/state)    │
+                  └───────────────────┬──────────────────────┘
+                                      │
+                  ┌───────────────────▼──────────────────────┐
+                  │          VALIDATE SERVICE AREA            │
+                  │  Tool: check_service_area                 │
+                  │  (compare location vs business.service_   │
+                  │   areas list — zip codes and city names)  │
+                  └────────────┬────────────────┬────────────┘
+                               │                │
+                in_service_area=TRUE   in_service_area=FALSE
+                               │                │
+                               ▼                ▼
+           ┌───────────────────────┐    ┌───────────────────────────┐
+           │     ASK PAIN POINT    │    │      POLITE DECLINE       │
+           │  "What issue can we   │    │  "We currently only serve │
+           │   help you with?"     │    │   [service_areas]..."     │
+           │  Tool: save_lead_info │    │  lead.status=out_of_area  │
+           │        (pain_point)   │    └─────────────┬─────────────┘
+           └────────────┬──────────┘                  │
+                        │                             │
+           ┌────────────▼──────────┐                  │
+           │    IDENTIFY SERVICE   │                  │
+           │  Map pain_point to    │                  │
+           │  business service     │                  │
+           │  catalog (by name)    │                  │
+           │  Set needs_media flag │                  │
+           │  (roofing/remodel/    │                  │
+           │   landscaping, etc.)  │                  │
+           └──┬───────────────┬────┘                  │
+              │               │                       │
+         service          not quotable                │
+         .quotable=True         │                     │
+              │                │                      │
+              ▼                │                      │
+   ┌──────────────────┐        │                      │
+   │    OFFER QUOTE   │        │                      │
+   │  Tool:           │        │                      │
+   │  get_quote_range │        │                      │
+   │  "Work like this │        │                      │
+   │   typically runs │        │                      │
+   │   $X – $Y"       │        │                      │
+   └────────┬─────────┘        │                      │
+            │                  │                      │
+            └──────┬───────────┘                      │
+                   │                                  │
+             needs_media?                             │
+          ┌────────┴──────────┐                       │
+         YES                  NO                      │
+          │                   │                       │
+          ▼                   │                       │
+  ┌───────────────┐           │                       │
+  │   ASK MEDIA   │           │                       │
+  │  "Can you     │           │                       │
+  │   share any   │──────────►│                       │
+  │   photos?"    │           │                       │
+  └───────────────┘           │                       │
+                              ▼                       │
+                  ┌───────────────────────┐           │
+                  │    ASK AVAILABILITY   │           │
+                  │  "What dates/times    │           │
+                  │   work best for you?" │           │
+                  │  Tool:               │           │
+                  │  get_available_slots  │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │     CHECK CALENDAR    │           │
+                  │  Google Calendar      │           │
+                  │  FreeBusy API query   │           │
+                  │  → open slot list     │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │     SUGGEST SLOTS     │           │
+                  │  Present up to 5      │           │
+                  │  available time       │           │
+                  │  options to customer  │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │    CONFIRM BOOKING    │           │
+                  │  Verify: service,     │           │
+                  │  date/time, name,     │           │
+                  │  phone, email         │           │
+                  │  Tools:               │           │
+                  │  save_lead_info +     │           │
+                  │  book_appointment     │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │    CREATE APPT        │           │
+                  │  DB: Appointment row  │           │
+                  │  Google Calendar      │           │
+                  │    event (invite)     │           │
+                  │  Tool:               │           │
+                  │  book_appointment     │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │      NOTIFY TEAM      │           │
+                  │  Slack webhook        │           │
+                  │  Email via Resend     │           │
+                  │  SMS via Twilio       │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                  ┌───────────▼───────────┐           │
+                  │   SCHEDULE REMINDERS  │           │
+                  │  Queue 24h + 1h       │           │
+                  │  reminders for lead   │           │
+                  │  (APScheduler picks   │           │
+                  │   them up later)      │           │
+                  └───────────┬───────────┘           │
+                              │                       │
+                              └──────────┬────────────┘
+                                         │
+                              ┌──────────▼──────────────┐
+                              │          DONE  ●         │
+                              │  Score lead (0-100)      │
+                              │  Mark convo is_active=F  │
+                              │  Set completed_at        │
+                              └──────────────────────────┘
+```
+
+**Tools available to the LLM at each stage:**
+
+| Node | Tools |
+|---|---|
+| ask_location | `save_lead_info` |
+| validate_service_area | `check_service_area`, `save_lead_info` |
+| ask_pain_point | `save_lead_info` |
+| identify_service | `save_lead_info`, `get_quote_range` |
+| offer_quote | `get_quote_range` |
+| ask_availability / check_calendar | `get_available_slots` |
+| confirm_booking | `save_lead_info`, `book_appointment` |
+| create_appointment | `book_appointment` |
+
+---
+
+### 3. Lead Status Lifecycle
+
+```
+              ┌─────────────────────────────────────────────────────────┐
+              │                   LEAD STATUS FLOW                       │
+              │                                                          │
+              │   new ──► qualifying ──► appointment_booked             │
+              │                │              │                          │
+              │                │              └──► appointment_completed │
+              │                │                                         │
+              │                ├──► out_of_area  (not in service area)  │
+              │                │                                         │
+              │                └──► lost  (dropped / no re-engagement)  │
+              │                                                          │
+              │  Lead Score (0-100):                                     │
+              │  +20 has phone  +15 has name    +20 in service area      │
+              │  +15 pain point +10 email       +10 service identified   │
+              │  +5  has photos +5  in business hours                    │
+              └─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 4. Background Scheduler (APScheduler)
+
+Two background jobs run independently of the conversation engine on fixed intervals.
+
+```
+              ┌─────────────────────────────────────────────────────────┐
+              │              BACKGROUND SCHEDULER                        │
+              │                                                          │
+              │  Every 15 min ──► check_appointment_reminders           │
+              │                                                          │
+              │    Appointments in status "scheduled" or "confirmed"    │
+              │                                                          │
+              │    23-25h before appt ─► send 24h reminder             │
+              │    50-70min before appt ─► send 1h reminder            │
+              │                                                          │
+              │    Reminder channels: SMS (Twilio) + Email (Resend)     │
+              │    Flags: reminder_24h_sent, reminder_1h_sent           │
+              │                                                          │
+              │  Every  5 min ──► check_dropoff_reengagement           │
+              │                                                          │
+              │    Leads in "qualifying" status                         │
+              │    Silent > 15 min, re_engagement_count < 2             │
+              │    ─► Send SMS nudge (max 2 attempts per lead)          │
+              │    Tracks: re_engagement_count, re_engagement_sent_at   │
+              └─────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites
